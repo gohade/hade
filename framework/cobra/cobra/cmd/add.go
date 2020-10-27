@@ -18,7 +18,7 @@ import (
 	"os"
 	"unicode"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 var (

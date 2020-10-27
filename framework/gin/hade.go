@@ -1,6 +1,6 @@
 package gin
 
-import "hade/framework"
+import "github.com/gohade/hade/framework"
 
 // Hade framework add functions
 

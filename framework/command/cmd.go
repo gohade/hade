@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"hade/framework/cobra"
-	commandUtil "hade/framework/command/util"
-	"hade/framework/contract"
-	"hade/framework/util"
+	"github.com/gohade/hade/framework/cobra"
+	commandUtil "github.com/gohade/hade/framework/command/util"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/util"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/jianfengye/collection"
@@ -114,8 +114,8 @@ var cmdTmpl string = `package command
 import (
 	"fmt"
 
-	"hade/framework/cobra"
-	"hade/framework/command/util"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/command/util"
 )
 
 var {{.|title}}Command = &cobra.Command{

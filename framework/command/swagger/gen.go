@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"hade/framework/cobra"
-	commandUtil "hade/framework/command/util"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework/cobra"
+	commandUtil "github.com/gohade/hade/framework/command/util"
+	"github.com/gohade/hade/framework/contract"
 
 	"github.com/swaggo/swag/gen"
 )

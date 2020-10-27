@@ -1,8 +1,8 @@
 package app
 
 import (
-	"hade/framework"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 )
 
 // HadeAppProvider provide a App service, it must be singlton, and not delay

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework/contract"
 )
 
 func TextFormatter(level contract.LogLevel, t time.Time, msg string, fields map[string]interface{}) ([]byte, error) {

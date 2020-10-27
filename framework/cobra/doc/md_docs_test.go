@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 func TestGenMdDoc(t *testing.T) {

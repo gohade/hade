@@ -5,7 +5,7 @@ import (
 	"os"
 	"text/template"
 
-	"hade/framework/cobra/cobra/tpl"
+	"github.com/gohade/hade/framework/cobra/cobra/tpl"
 )
 
 // Project contains name, license and paths to projects.

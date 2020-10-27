@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework/contract"
 
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"

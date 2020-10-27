@@ -1,8 +1,8 @@
 package http
 
 import (
-	"hade/app/http/module/demo"
-	"hade/framework/gin"
+	"github.com/gohade/hade/app/http/module/demo"
+	"github.com/gohade/hade/framework/gin"
 )
 
 func Routes(r *gin.Engine) {

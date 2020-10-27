@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 func translate(in string) string {

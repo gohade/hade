@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"hade/framework"
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 type ContainerKey string

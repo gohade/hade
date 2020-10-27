@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"hade/framework/gin/testdata/protoexample"
+	"github.com/gohade/hade/framework/gin/testdata/protoexample"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"

@@ -1,18 +1,18 @@
 package main
 
 import (
-	"hade/app/console"
-	"hade/app/http"
-	"hade/app/provider"
-	"hade/framework"
-	"hade/framework/provider/app"
-	"hade/framework/provider/config"
-	"hade/framework/provider/env"
-	"hade/framework/provider/id"
-	"hade/framework/provider/kernel"
-	"hade/framework/provider/log"
-	"hade/framework/provider/ssh"
-	"hade/framework/util"
+	"github.com/gohade/hade/app/console"
+	"github.com/gohade/hade/app/http"
+	"github.com/gohade/hade/app/provider"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/provider/app"
+	"github.com/gohade/hade/framework/provider/config"
+	"github.com/gohade/hade/framework/provider/env"
+	"github.com/gohade/hade/framework/provider/id"
+	"github.com/gohade/hade/framework/provider/kernel"
+	"github.com/gohade/hade/framework/provider/log"
+	"github.com/gohade/hade/framework/provider/ssh"
+	"github.com/gohade/hade/framework/util"
 )
 
 func main() {

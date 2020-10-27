@@ -17,7 +17,7 @@ package cmd
 
 import (
 	"fmt"
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 	"os"
 
 	homedir "github.com/mitchellh/go-homedir"

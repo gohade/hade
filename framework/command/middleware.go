@@ -9,15 +9,15 @@ import (
 	"path"
 	"path/filepath"
 
-	"hade/framework/cobra"
-	"hade/framework/command/util"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/command/util"
+	"github.com/gohade/hade/framework/contract"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/jianfengye/collection"
 )
 
-var ginPath string = "hade/framework/gin"
+var ginPath string = "github.com/gohade/hade/framework/gin"
 
 // middlewareCommand show all installed middleware
 var middlewareCommand = &cobra.Command{

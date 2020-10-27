@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"hade/framework/gin/internal/json"
+	"github.com/gohade/hade/framework/gin/internal/json"
 )
 
 var errUnknownType = errors.New("Unknown type")

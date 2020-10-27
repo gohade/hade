@@ -1,10 +1,10 @@
 package console
 
 import (
-	"hade/framework"
-	"hade/framework/cobra"
-	hadeCommand "hade/framework/command"
-	commandUtil "hade/framework/command/util"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/cobra"
+	hadeCommand "github.com/gohade/hade/framework/command"
+	commandUtil "github.com/gohade/hade/framework/command/util"
 )
 
 // RunCommand is command

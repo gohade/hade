@@ -8,8 +8,8 @@ import (
 	"path"
 	"path/filepath"
 
-	"hade/framework/cobra"
-	"hade/framework/util"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/util"
 
 	"github.com/pkg/errors"
 )

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"hade/framework"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"

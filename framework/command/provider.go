@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"strings"
 
-	"hade/framework"
-	"hade/framework/cobra"
-	commandUtil "hade/framework/command/util"
-	"hade/framework/contract"
-	"hade/framework/util"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/cobra"
+	commandUtil "github.com/gohade/hade/framework/command/util"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/util"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/jianfengye/collection"
@@ -158,7 +158,7 @@ type Service interface {
 var providerTmp string = `package {{.}}
 
 import (
-	"hade/framework"
+	"github.com/gohade/hade/framework"
 )
 
 type {{.|title}}Provider struct {
@@ -192,7 +192,7 @@ func (sp *{{.|title}}Provider) Boot(c framework.Container) error {
 
 var serviceTmp string = `package {{.}}
 
-import "hade/framework"
+import "github.com/gohade/hade/framework"
 
 type {{.|title}}Service struct {
 	container framework.Container

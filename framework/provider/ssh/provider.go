@@ -1,8 +1,8 @@
 package ssh
 
 import (
-	"hade/framework"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 )
 
 // HadeSSHProvider provide a App service, it must be singlton, and not delay

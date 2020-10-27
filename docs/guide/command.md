@@ -52,8 +52,8 @@ package command
 import (
         "fmt"
 
-        "hade/framework/cobra"
-        "hade/framework/command/util"
+        "github.com/gohade/hade/framework/cobra"
+        "github.com/gohade/hade/framework/command/util"
 )
 
 var TestCommand = &cobra.Command{

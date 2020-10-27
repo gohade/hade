@@ -4,11 +4,11 @@ import (
 	"os"
 	"strings"
 
-	"hade/framework"
-	"hade/framework/contract"
-	"hade/framework/provider/log/formatter"
-	"hade/framework/provider/log/services"
-	"hade/framework/util"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/provider/log/formatter"
+	"github.com/gohade/hade/framework/provider/log/services"
+	"github.com/gohade/hade/framework/util"
 )
 
 type HadeLogServiceProvider struct {

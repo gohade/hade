@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/net/webdav"
 
-	"hade/framework/gin"
+	"github.com/gohade/hade/framework/gin"
 
 	"github.com/swaggo/swag"
 )

@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"hade/framework/contract"
-	"hade/tests"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/tests"
 
 	. "github.com/smartystreets/goconvey/convey"
 )

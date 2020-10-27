@@ -1,7 +1,7 @@
 package kernel
 
 import (
-	"hade/framework/gin"
+	"github.com/gohade/hade/framework/gin"
 )
 
 type HadeKernelService struct {

@@ -8,8 +8,8 @@ package main
 import (
 	"log"
 
-	"hade/framework/cobra"
-	"hade/framework/cobra/doc"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra/doc"
 )
 
 func main() {

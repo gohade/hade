@@ -60,7 +60,7 @@ provider.go 提供服务适配的实现，实现一个Provider必须实现对应
 package demo
 
 import (
-	"hade/framework"
+	"github.com/gohade/hade/framework"
 )
 
 type DemoProvider struct {
@@ -105,7 +105,7 @@ service.go提供具体的实现，它至少需要提供一个实例化的方法 
 ```
 package demo
 
-import "hade/framework"
+import "github.com/gohade/hade/framework"
 
 type Service struct {
 	container framework.Container

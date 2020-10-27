@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"hade/framework"
-	"hade/framework/gin/binding"
-	"hade/framework/gin/render"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/gin/binding"
+	"github.com/gohade/hade/framework/gin/render"
 
 	"github.com/gin-contrib/sse"
 )

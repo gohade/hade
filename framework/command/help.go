@@ -1,7 +1,7 @@
 package command
 
 import (
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 // helpCommand show current envionment

@@ -6,9 +6,9 @@ import (
 	pkgLog "log"
 	"time"
 
-	"hade/framework"
-	"hade/framework/contract"
-	"hade/framework/provider/log/formatter"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/provider/log/formatter"
 )
 
 type HadeLog struct {

@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"hade/framework/cobra"
-	commandUtil "hade/framework/command/util"
-	"hade/framework/contract"
-	"hade/framework/util"
+	"github.com/gohade/hade/framework/cobra"
+	commandUtil "github.com/gohade/hade/framework/command/util"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/util"
 
 	"github.com/erikdubbelboer/gspt"
 	"github.com/sevlyar/go-daemon"

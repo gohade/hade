@@ -1,7 +1,7 @@
 package contract
 
 import (
-	"hade/framework/gin"
+	"github.com/gohade/hade/framework/gin"
 )
 
 const KernelKey = "hade:kernel"

@@ -1,6 +1,6 @@
 package swagger
 
-import "hade/framework/cobra"
+import "github.com/gohade/hade/framework/cobra"
 
 var IndexCommand = &cobra.Command{
 	Use:   "swagger",

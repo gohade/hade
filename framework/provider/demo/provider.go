@@ -3,7 +3,7 @@ package demo
 import (
 	"fmt"
 
-	"hade/framework"
+	"github.com/gohade/hade/framework"
 )
 
 type DemoServiceProvider struct {

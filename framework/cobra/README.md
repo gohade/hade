@@ -135,7 +135,7 @@ along with the library and its dependencies:
 Next, include Cobra in your application:
 
 ```go
-import "hade/framework/cobra"
+import "github.com/gohade/hade/framework/cobra"
 ```
 
 # Getting Started
@@ -217,7 +217,7 @@ import (
 	"os"
 
 	homedir "github.com/mitchellh/go-homedir"
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -318,7 +318,7 @@ package cmd
 import (
   "fmt"
 
-  "hade/framework/cobra"
+  "github.com/gohade/hade/framework/cobra"
 )
 
 func init() {
@@ -464,7 +464,7 @@ import (
   "fmt"
   "strings"
 
-  "hade/framework/cobra"
+  "github.com/gohade/hade/framework/cobra"
 )
 
 func main() {
@@ -631,7 +631,7 @@ package main
 import (
   "fmt"
 
-  "hade/framework/cobra"
+  "github.com/gohade/hade/framework/cobra"
 )
 
 func main() {

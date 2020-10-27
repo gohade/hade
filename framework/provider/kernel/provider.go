@@ -1,9 +1,9 @@
 package kernel
 
 import (
-	"hade/framework"
-	"hade/framework/contract"
-	"hade/framework/gin"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/gin"
 )
 
 // HadeAppProvider provide a App service, it must be singlton, and not delay

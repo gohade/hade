@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"hade/framework"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 
 	rotatelogs "github.com/lestrrat/go-file-rotatelogs"
 	"github.com/pkg/errors"

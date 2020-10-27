@@ -16,7 +16,7 @@ package doc
 import (
 	"strings"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 // Test to see if we have a reason to print See Also information in docs

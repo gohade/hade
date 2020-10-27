@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"hade/app/provider/demo"
-	"hade/framework/provider/app"
+	"github.com/gohade/hade/app/provider/demo"
+	"github.com/gohade/hade/framework/provider/app"
 )
 
 func Test_hade_providerDoc(t *testing.T) {

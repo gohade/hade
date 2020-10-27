@@ -3,11 +3,11 @@ package config
 import (
 	"testing"
 
-	"hade/framework"
-	"hade/framework/contract"
-	"hade/framework/provider/app"
-	"hade/framework/provider/env"
-	"hade/tests"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/provider/app"
+	"github.com/gohade/hade/framework/provider/env"
+	"github.com/gohade/hade/tests"
 
 	. "github.com/smartystreets/goconvey/convey"
 )

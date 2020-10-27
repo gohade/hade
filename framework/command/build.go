@@ -5,7 +5,7 @@ import (
 	"log"
 	"os/exec"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 var buildCommand = &cobra.Command{

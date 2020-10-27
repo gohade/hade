@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 // npm just run local go bin

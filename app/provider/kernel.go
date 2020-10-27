@@ -1,8 +1,8 @@
 package provider
 
 import (
-	"hade/app/provider/demo"
-	"hade/framework"
+	"github.com/gohade/hade/app/provider/demo"
+	"github.com/gohade/hade/framework"
 )
 
 // customer provider

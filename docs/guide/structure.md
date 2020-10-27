@@ -140,7 +140,7 @@ type Student struct {
 ```
 package demo
 
-import "hade/framework"
+import "github.com/gohade/hade/framework"
 
 type Service struct {
 	container framework.Container

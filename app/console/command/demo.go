@@ -3,8 +3,8 @@ package command
 import (
 	"log"
 
-	"hade/framework/cobra"
-	"hade/framework/command/util"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/command/util"
 )
 
 var DemoCommand = &cobra.Command{

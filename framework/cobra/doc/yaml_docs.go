@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"

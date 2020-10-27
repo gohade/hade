@@ -18,7 +18,7 @@ package cmd
 import (
 	"fmt"
 
-	"hade/framework/cobra"
+	"github.com/gohade/hade/framework/cobra"
 )
 
 // testCmd represents the test command

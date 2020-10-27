@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"hade/framework"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 
 	"github.com/pkg/errors"
 )

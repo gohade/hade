@@ -1,8 +1,8 @@
 package command
 
 import (
-	"hade/framework/cobra"
-	"hade/framework/command/swagger"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/command/swagger"
 )
 
 // AddKernelCommands will add all command/* to root command

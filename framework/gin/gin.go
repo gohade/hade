@@ -13,8 +13,8 @@ import (
 	"path"
 	"sync"
 
-	"hade/framework"
-	"hade/framework/gin/render"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/gin/render"
 )
 
 const defaultMultipartMemory = 32 << 20 // 32 MB

@@ -1,8 +1,8 @@
 package gorm
 
 import (
-	"hade/framework"
-	"hade/framework/contract"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 )
 
 type GormServiceProvider struct {
