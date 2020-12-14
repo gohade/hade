@@ -49,7 +49,7 @@ var newCommand = &cobra.Command{
 		}
 
 		// 拷贝template项目
-		url := "https://hade-template/-/archive/master/hade-template-master.zip"
+		url := "https://github.com/gohade/template/archive/main.zip"
 		err := util.DownloadFile("hade-template-master.zip", url)
 		if err != nil {
 			return err
