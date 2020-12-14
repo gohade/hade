@@ -50,22 +50,22 @@ var newCommand = &cobra.Command{
 
 		// 拷贝template项目
 		url := "https://github.com/gohade/template/archive/main.zip"
-		err := util.DownloadFile("hade-template-master.zip", url)
+		err := util.DownloadFile("template-main.zip", url)
 		if err != nil {
 			return err
 		}
 
-		_, err = util.Unzip("hade-template-master.zip", "/tmp/")
+		_, err = util.Unzip("template-main.zip", currentPath)
 		if err != nil {
 			return err
 		}
 
 		// TODO: check do not use tmp file
-		if err := os.Rename("/tmp/hade-template-master/", folder); err != nil {
+		if err := os.Rename(filepath.Join(currentPath, "/template-main"), folder); err != nil {
 			return err
 		}
 
-		if err := os.Remove("hade-template-master.zip"); err != nil {
+		if err := os.Remove("template-main.zip"); err != nil {
 			return err
 		}
 		fmt.Println("remove " + path.Join(folder, ".git"))
