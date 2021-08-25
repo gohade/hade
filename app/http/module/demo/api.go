@@ -12,7 +12,7 @@ type DemoApi struct {
 
 func Register(r *gin.Engine) error {
 	api := NewDemoApi()
-	r.Container().Singleton(&demoService.DemoProvider{})
+	r.Container().Bind(&demoService.DemoProvider{})
 
 	r.GET("/demo/demo", api.Demo)
 	r.GET("/demo/demo2", api.Demo2)

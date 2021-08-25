@@ -19,15 +19,15 @@ func main() {
 	container := framework.NewHadeContainer()
 
 	basePath := util.GetExecDirectory()
-	container.Singleton(&app.HadeAppProvider{BasePath: basePath})
-	container.Singleton(&env.HadeEnvProvider{})
-	container.Singleton(&config.HadeConfigProvider{})
-	container.Singleton(&log.HadeLogServiceProvider{})
-	container.Singleton(&id.HadeIDProvider{})
-	container.Singleton(&ssh.HadeSSHProvider{})
+	container.Bind(&app.HadeAppProvider{BasePath: basePath})
+	container.Bind(&env.HadeEnvProvider{})
+	container.Bind(&config.HadeConfigProvider{})
+	container.Bind(&log.HadeLogServiceProvider{})
+	container.Bind(&id.HadeIDProvider{})
+	container.Bind(&ssh.HadeSSHProvider{})
 
 	if engine, err := http.NewHttpEngine(); err == nil {
-		container.Singleton(&kernel.HadeKernelProvider{HttpEngine: engine})
+		container.Bind(&kernel.HadeKernelProvider{HttpEngine: engine})
 	}
 
 	// custom register

@@ -7,5 +7,5 @@ import (
 
 // customer provider
 func RegisterCustomProvider(c framework.Container) {
-	c.Bind(&demo.DemoProvider{}, true)
+	c.Bind(&demo.DemoProvider{})
 }

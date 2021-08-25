@@ -10,9 +10,7 @@ import (
 // Container is a core struct which store provider and instance
 type Container interface {
 	// Bind bind a service provider
-	Bind(provider ServiceProvider, isSingleton bool) error
-	// Singlton is Bind a singlton service provider
-	Singleton(provider ServiceProvider) error
+	Bind(provider ServiceProvider) error
 	// IsBind check a service provider has been bind
 	IsBind(key string) bool
 
@@ -30,35 +28,27 @@ type Container interface {
 // HadeContainer is instance of Container
 type HadeContainer struct {
 	Container
-	providers    []ServiceProvider
-	instances    map[string]interface{}
-	methods      map[string]NewInstance
-	isSingletons map[string]bool
-
+	// providers store many provider
+	providers map[string]ServiceProvider
+	// instance store instances
+	instances map[string]interface{}
+	// lock for container for change bind
 	lock sync.RWMutex
 }
 
 // NewHadeContainer is new instance
 func NewHadeContainer() *HadeContainer {
 	return &HadeContainer{
-		providers:    []ServiceProvider{},
-		instances:    map[string]interface{}{},
-		methods:      map[string]NewInstance{},
-		isSingletons: map[string]bool{},
-		lock:         sync.RWMutex{},
+		providers: map[string]ServiceProvider{},
+		instances: map[string]interface{}{},
+		lock:      sync.RWMutex{},
 	}
-}
-
-func (hade *HadeContainer) GetProviders() []ServiceProvider {
-	return hade.providers
 }
 
 func (hade *HadeContainer) PrintList() []string {
 	ret := []string{}
 	for _, provider := range hade.providers {
 		name := provider.Name()
-		// register := provider.Register(hade)
-		// funcName := reflect.TypeOf(register).Name()
 
 		line := fmt.Sprint(name)
 		ret = append(ret, line)
@@ -67,14 +57,12 @@ func (hade *HadeContainer) PrintList() []string {
 }
 
 // Bind make relationship between provider and contract
-func (hade *HadeContainer) Bind(provider ServiceProvider, isSingleton bool) error {
+func (hade *HadeContainer) Bind(provider ServiceProvider) error {
 	hade.lock.RLock()
 	defer hade.lock.RUnlock()
 	key := provider.Name()
 
-	hade.providers = append(hade.providers, provider)
-	hade.isSingletons[key] = isSingleton
-	hade.methods[key] = provider.Register(hade)
+	hade.providers[key] = provider
 
 	// if provider is not defer
 	if provider.IsDefer() == false {
@@ -82,21 +70,14 @@ func (hade *HadeContainer) Bind(provider ServiceProvider, isSingleton bool) erro
 			return err
 		}
 		params := provider.Params()
-		method := hade.methods[key]
+		method := provider.Register(hade)
 		instance, err := method(params...)
 		if err != nil {
 			return errors.New(err.Error())
 		}
-		if isSingleton == true {
-			hade.instances[key] = instance
-		}
+		hade.instances[key] = instance
 	}
 	return nil
-}
-
-// Singleton make provider be Singleton, instance once
-func (hade *HadeContainer) Singleton(provider ServiceProvider) error {
-	return hade.Bind(provider, true)
 }
 
 func (hade *HadeContainer) IsBind(key string) bool {
@@ -104,10 +85,8 @@ func (hade *HadeContainer) IsBind(key string) bool {
 }
 
 func (hade *HadeContainer) findServiceProvider(key string) ServiceProvider {
-	for _, sp := range hade.providers {
-		if sp.Name() == key {
-			return sp
-		}
+	if sp, ok := hade.providers[key]; ok {
+		return sp
 	}
 	return nil
 }
@@ -128,38 +107,47 @@ func (hade *HadeContainer) MakeNew(key string, params []interface{}) (interface{
 	return hade.make(key, params, true)
 }
 
-func (hade *HadeContainer) make(key string, params []interface{}, isNew bool) (interface{}, error) {
+func (hade *HadeContainer) make(key string, params []interface{}, forceNew bool) (interface{}, error) {
 	// check has Register
-	if hade.findServiceProvider(key) == nil {
+	sp := hade.findServiceProvider(key)
+	if sp == nil {
 		return nil, errors.New("contract " + key + " have not register")
 	}
 
-	// if isNew, call boot
-	if isNew == false {
-		// check instance
-		if ins, ok := hade.instances[key]; ok {
-			return ins, nil
+	if forceNew {
+		if err := sp.Boot(hade); err != nil {
+			return nil, err
 		}
+		if params == nil {
+			params = sp.Params()
+		}
+		method := sp.Register(hade)
+		ins, err := method(params...)
+		if err != nil {
+			return nil, errors.New(err.Error())
+		}
+
+		return ins, nil
 	}
 
-	// is not instance
-	method := hade.methods[key] // must ok
-	prov := hade.findServiceProvider(key)
-	isSingle := hade.isSingletons[key]
-	if err := prov.Boot(hade); err != nil {
+	// not force New
+	// bool ins
+	if ins, ok := hade.instances[key]; ok {
+		return ins, nil
+	}
+
+	if err := sp.Boot(hade); err != nil {
 		return nil, err
 	}
 	if params == nil {
-		params = prov.Params()
+		params = sp.Params()
 	}
+	method := sp.Register(hade)
 	ins, err := method(params...)
 	if err != nil {
 		return nil, errors.New(err.Error())
 	}
 
-	if isSingle {
-		hade.instances[key] = ins
-		return ins, nil
-	}
+	hade.instances[key] = ins
 	return ins, nil
 }
