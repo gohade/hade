@@ -1,53 +1,37 @@
 package command
 
-import (
-	"github.com/gohade/hade/framework/cobra"
-	"github.com/gohade/hade/framework/command/swagger"
-)
+import "github.com/gohade/hade/framework/cobra"
 
 // AddKernelCommands will add all command/* to root command
 func AddKernelCommands(root *cobra.Command) {
-	root.SetHelpCommand(helpCommand)
-
-	root.AddCommand(envCommand)
-	root.AddCommand(deployCommand)
-
-	// cron
-	root.AddCommand(initCronCommand())
-	// cmd
-	cmdCommand.AddCommand(cmdListCommand)
-	cmdCommand.AddCommand(cmdCreateCommand)
-	root.AddCommand(cmdCommand)
-
-	// build
-	buildCommand.AddCommand(buildSelfCommand)
-	buildCommand.AddCommand(buildBackendCommand)
-	buildCommand.AddCommand(buildFrontendCommand)
-	buildCommand.AddCommand(buildAllCommand)
-	root.AddCommand(buildCommand)
-
-	// app
+	// app 命令
 	root.AddCommand(initAppCommand())
-
+	// env 命令
+	root.AddCommand(initEnvCommand())
+	// cron 命令
+	root.AddCommand(initCronCommand())
+	// config 命令
+	root.AddCommand(initConfigCommand())
+	// build 命令
+	root.AddCommand(initBuildCommand())
+	// go build
+	root.AddCommand(goCommand)
+	// npm build
+	root.AddCommand(npmCommand)
 	// dev
 	root.AddCommand(initDevCommand())
-
-	// middleware
-	middlewareCommand.AddCommand(middlewareAllCommand)
-	middlewareCommand.AddCommand(middlewareAddCommand)
-	middlewareCommand.AddCommand(middlewareRemoveCommand)
-	root.AddCommand(middlewareCommand)
-
-	// swagger
-	swagger.IndexCommand.AddCommand(swagger.InitServeCommand())
-	swagger.IndexCommand.AddCommand(swagger.GenCommand)
-	root.AddCommand(swagger.IndexCommand)
-
+	// cmd
+	root.AddCommand(initCmdCommand())
 	// provider
-	providerCommand.AddCommand(providerListCommand)
-	providerCommand.AddCommand(providerCreateCommand)
-	root.AddCommand(providerCommand)
-
+	root.AddCommand(initProviderCommand())
+	// middleware
+	root.AddCommand(initMiddlewareCommand())
 	// new
 	root.AddCommand(initNewCommand())
+	//
+	//// swagger
+	//swagger.IndexCommand.AddCommand(swagger.InitServeCommand())
+	//swagger.IndexCommand.AddCommand(swagger.GenCommand)
+	//root.AddCommand(swagger.IndexCommand)
+	//
 }

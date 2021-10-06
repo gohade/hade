@@ -17,7 +17,7 @@ func (provider *HadeEnvProvider) Register(c framework.Container) framework.NewIn
 // Boot will called when the service instantiate
 func (provider *HadeEnvProvider) Boot(c framework.Container) error {
 	app := c.MustMake(contract.AppKey).(contract.App)
-	provider.Folder = app.EnvironmentPath()
+	provider.Folder = app.BaseFolder()
 	return nil
 }
 
@@ -27,7 +27,7 @@ func (provider *HadeEnvProvider) IsDefer() bool {
 }
 
 // Params define the necessary params for NewInstance
-func (provider *HadeEnvProvider) Params() []interface{} {
+func (provider *HadeEnvProvider) Params(c framework.Container) []interface{} {
 	return []interface{}{provider.Folder}
 }
 

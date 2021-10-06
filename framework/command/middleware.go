@@ -2,27 +2,37 @@ package command
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/go-git/go-git/v5"
+	"github.com/gohade/hade/framework/util"
+	"github.com/jianfengye/collection"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
+	"text/template"
 
 	"github.com/gohade/hade/framework/cobra"
-	"github.com/gohade/hade/framework/command/util"
 	"github.com/gohade/hade/framework/contract"
-
-	"github.com/go-git/go-git/v5"
-	"github.com/jianfengye/collection"
 )
 
 var ginPath string = "github.com/gohade/hade/framework/gin"
 
-// middlewareCommand show all installed middleware
+// 初始化中间件相关命令
+func initMiddlewareCommand() *cobra.Command {
+	middlewareCommand.AddCommand(middlewareAllCommand)
+	middlewareCommand.AddCommand(middlewareMigrateCommand)
+	middlewareCommand.AddCommand(middlewareCreateCommand)
+	return middlewareCommand
+}
+
+// middlewareCommand 中间件二级命令
 var middlewareCommand = &cobra.Command{
 	Use:   "middleware",
-	Short: "hade middleware",
+	Short: "中间件相关命令",
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			c.Help()
@@ -31,15 +41,17 @@ var middlewareCommand = &cobra.Command{
 	},
 }
 
+// middlewareAllCommand 显示所有安装的中间件
 var middlewareAllCommand = &cobra.Command{
 	Use:   "list",
-	Short: "list all installed middleware",
+	Short: "显示所有中间件",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := util.GetContainer(c.Root())
+		container := c.GetContainer()
 		appService := container.MustMake(contract.AppKey).(contract.App)
 
-		middlewarePath := path.Join(appService.BasePath(), "app", "http", "middleware")
-		// check folder
+		middlewarePath := path.Join(appService.BaseFolder(), "app", "http", "middleware")
+
+		// 读取文件夹
 		files, err := ioutil.ReadDir(middlewarePath)
 		if err != nil {
 			return err
@@ -53,9 +65,10 @@ var middlewareAllCommand = &cobra.Command{
 	},
 }
 
-var middlewareAddCommand = &cobra.Command{
-	Use:   "add",
-	Short: "add middleware to app, https://github.com/gin-contrib/[middleware].git",
+// 从gin-contrib中迁移中间件
+var middlewareMigrateCommand = &cobra.Command{
+	Use:   "migrate",
+	Short: "迁移gin-contrib中间件, 迁移地址：https://github.com/gin-contrib/[middleware].git",
 	RunE: func(c *cobra.Command, args []string) error {
 		// step1 : read args
 		if len(args) != 1 {
@@ -63,12 +76,12 @@ var middlewareAddCommand = &cobra.Command{
 		}
 		repo := args[0]
 		// step2 : download git to middleware sub directory
-		container := util.GetContainer(c.Root())
+		container := c.GetContainer()
 		appService := container.MustMake(contract.AppKey).(contract.App)
 
-		middlewarePath := path.Join(appService.BasePath(), "app", "http", "middleware")
+		middlewarePath := path.Join(appService.BaseFolder(), "app", "http", "middleware")
 		url := "https://github.com/gin-contrib/" + repo + ".git"
-		fmt.Println("download middleware from gin-contrib:")
+		fmt.Println("下载中间件 gin-contrib:")
 		fmt.Println(url)
 		_, err := git.PlainClone(path.Join(middlewarePath, repo), false, &git.CloneOptions{
 			URL:      url,
@@ -118,33 +131,80 @@ var middlewareAddCommand = &cobra.Command{
 	},
 }
 
-var middlewareRemoveCommand = &cobra.Command{
-	Use:   "remove",
-	Short: "remove middleware from app",
+// providerCreateCommand 创建一个新的服务，包括服务提供者，服务接口协议，服务实例
+var middlewareCreateCommand = &cobra.Command{
+	Use:     "new",
+	Aliases: []string{"create", "init"},
+	Short:   "创建一个中间件",
 	RunE: func(c *cobra.Command, args []string) error {
-		if len(args) <= 0 {
-			return errors.New("arg is invalid")
+		container := c.GetContainer()
+		fmt.Println("创建一个中间件")
+		var name string
+		var folder string
+		{
+			prompt := &survey.Input{
+				Message: "请输入中间件名称：",
+			}
+			err := survey.AskOne(prompt, &name)
+			if err != nil {
+				return err
+			}
+		}
+		{
+			prompt := &survey.Input{
+				Message: "请输入中间件所在目录名称(默认: 同中间件名称):",
+			}
+			err := survey.AskOne(prompt, &folder)
+			if err != nil {
+				return err
+			}
 		}
 
-		container := util.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
+		app := container.MustMake(contract.AppKey).(contract.App)
 
-		middlewarePath := path.Join(appService.BasePath(), "app", "http", "middleware")
-
-		files, err := ioutil.ReadDir(middlewarePath)
+		pFolder := app.MiddlewareFolder()
+		subFolders, err := util.SubDir(pFolder)
 		if err != nil {
 			return err
 		}
+		subColl := collection.NewStrCollection(subFolders)
+		if subColl.Contains(folder) {
+			fmt.Println("目录已经存在")
+			return nil
+		}
 
-		collection := collection.NewStrCollection(args)
+		// 开始创建文件
+		if err := os.Mkdir(filepath.Join(pFolder, folder), 0700); err != nil {
+			return err
+		}
+		funcs := template.FuncMap{"title": strings.Title}
+		{
+			//  创建
+			file := filepath.Join(pFolder, folder, "middleware.go")
+			f, err := os.Create(file)
+			if err != nil {
+				return errors.Cause(err)
+			}
 
-		for _, file := range files {
-			if file.IsDir() && collection.Contains(file.Name()) {
-				os.RemoveAll(path.Join(middlewarePath, file.Name()))
+			t := template.Must(template.New("middleware").Funcs(funcs).Parse(middlewareTmp))
+			if err := t.Execute(f, name); err != nil {
+				return errors.Cause(err)
 			}
 		}
+		fmt.Println("创建中间件成功, 文件夹地址:", filepath.Join(pFolder, folder))
 		return nil
 	},
 }
 
-// TODO: add create command for middleware
+var middlewareTmp string = `package {{.}}
+
+import "github.com/gohade/hade/framework/gin"
+
+// {{.|title}}Middleware 代表中间件函数
+func {{.|title}}Middleware() gin.HandlerFunc {
+	return func(context *gin.Context) {
+		context.Next()
+	}
+}
+
+`

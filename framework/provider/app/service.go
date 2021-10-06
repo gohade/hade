@@ -1,101 +1,150 @@
 package app
 
+import (
+	"flag"
+	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/util"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"path/filepath"
+)
+
+// HadeApp 代表hade框架的App实现
 type HadeApp struct {
-	basePath string
+	container  framework.Container // 服务容器
+	baseFolder string              // 基础路径
+	appId      string              // 表示当前这个app的唯一id, 可以用于分布式锁等
 
-	storagePath  string
-	logPath      string
-	cachePath    string
-	coveragePath string
-	pidPath      string
+	configMap map[string]string // 配置加载
 }
 
+// AppID 表示这个App的唯一ID
+func (app HadeApp) AppID() string {
+	return app.appId
+}
+
+// Version 实现版本
+func (app HadeApp) Version() string {
+	return "0.0.3"
+}
+
+// BaseFolder 表示基础目录，可以代表开发场景的目录，也可以代表运行时候的目录
+func (app HadeApp) BaseFolder() string {
+	if app.baseFolder != "" {
+		return app.baseFolder
+	}
+
+	// 如果参数也没有，使用默认的当前路径
+	return util.GetExecDirectory()
+}
+
+// ConfigFolder  表示配置文件地址
+func (app HadeApp) ConfigFolder() string {
+	if val, ok := app.configMap["config_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "config")
+}
+
+// LogFolder 表示日志存放地址
+func (app HadeApp) LogFolder() string {
+	if val, ok := app.configMap["log_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.StorageFolder(), "log")
+}
+
+func (app HadeApp) HttpFolder() string {
+	if val, ok := app.configMap["http_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "app", "http")
+}
+
+func (app HadeApp) ConsoleFolder() string {
+	if val, ok := app.configMap["console_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "app", "console")
+}
+
+func (app HadeApp) StorageFolder() string {
+	if val, ok := app.configMap["storage_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "storage")
+}
+
+// ProviderFolder 定义业务自己的服务提供者地址
+func (app HadeApp) ProviderFolder() string {
+	if val, ok := app.configMap["provider_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "app", "provider")
+}
+
+// MiddlewareFolder 定义业务自己定义的中间件
+func (app HadeApp) MiddlewareFolder() string {
+	if val, ok := app.configMap["middleware_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.HttpFolder(), "middleware")
+}
+
+// CommandFolder 定义业务定义的命令
+func (app HadeApp) CommandFolder() string {
+	if val, ok := app.configMap["command_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.ConsoleFolder(), "command")
+}
+
+// RuntimeFolder 定义业务的运行中间态信息
+func (app HadeApp) RuntimeFolder() string {
+	if val, ok := app.configMap["runtime_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.StorageFolder(), "runtime")
+}
+
+// TestFolder 定义测试需要的信息
+func (app HadeApp) TestFolder() string {
+	if val, ok := app.configMap["test_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "test")
+}
+
+// NewHadeApp 初始化HadeApp
 func NewHadeApp(params ...interface{}) (interface{}, error) {
-	var basePath string
-	if len(params) == 1 {
-		basePath = params[0].(string)
+	if len(params) != 2 {
+		return nil, errors.New("param error")
 	}
-	return &HadeApp{basePath: basePath}, nil
-}
 
-// application version
-func (app *HadeApp) Version() string {
-	return "0.2"
-}
-
-// base path which is the base folder
-func (app *HadeApp) BasePath() string {
-	return app.basePath
-}
-
-// base path which is the base folder
-func (app *HadeApp) AppPath() string {
-	return app.BasePath() + "app/"
-}
-
-func (app *HadeApp) HttpPath() string {
-	return app.AppPath() + "http/"
-}
-
-func (app *HadeApp) SwaggerPath() string {
-	return app.HttpPath() + "swagger/"
-}
-
-func (app *HadeApp) ConsolePath() string {
-	return app.AppPath() + "console/"
-}
-
-// config folder which contains config
-func (app *HadeApp) ConfigPath() string {
-	return app.BasePath() + "config/"
-}
-
-// environmentPath which contain .env
-func (app *HadeApp) EnvironmentPath() string {
-	return app.BasePath()
-}
-
-// storagePath define storage folder
-func (app *HadeApp) StoragePath() string {
-	if app.storagePath != "" {
-		return app.storagePath
+	// 有两个参数，一个是容器，一个是baseFolder
+	container := params[0].(framework.Container)
+	baseFolder := params[1].(string)
+	// 如果没有设置，则使用参数
+	if baseFolder == "" {
+		flag.StringVar(&baseFolder, "base_folder", "", "base_folder参数, 默认为当前路径")
+		flag.Parse()
 	}
-	return app.BasePath() + "storage/"
+	appId := uuid.New().String()
+	configMap := map[string]string{}
+	return &HadeApp{baseFolder: baseFolder, container: container, appId: appId, configMap: configMap}, nil
 }
 
-// logPath define logPath
-func (app *HadeApp) LogPath() string {
-	if app.logPath != "" {
-		return app.logPath
-	}
-	return app.StoragePath() + "log/"
-}
-
-func (app *HadeApp) PidPath() string {
-	if app.pidPath != "" {
-		return app.pidPath
-	}
-	return app.StoragePath() + "pid/"
-}
-
-func (app *HadeApp) CachePath() string {
-	if app.cachePath != "" {
-		return app.cachePath
-	}
-	return app.StoragePath() + "cache/"
-}
-
+// LoadAppConfig 加载配置map
 func (app *HadeApp) LoadAppConfig(kv map[string]string) {
-	if v, ok := kv["storage"]; ok {
-		app.storagePath = v
+	for key, val := range kv {
+		app.configMap[key] = val
 	}
-	if v, ok := kv["log"]; ok {
-		app.logPath = v
+}
+
+// AppFolder 代表app目录
+func (app *HadeApp) AppFolder() string {
+	if val, ok := app.configMap["app_folder"]; ok {
+		return val
 	}
-	if v, ok := kv["pid"]; ok {
-		app.pidPath = v
-	}
-	if v, ok := kv["cache"]; ok {
-		app.cachePath = v
-	}
+	return filepath.Join(app.BaseFolder(), "app")
 }

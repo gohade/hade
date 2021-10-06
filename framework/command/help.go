@@ -1,21 +1,18 @@
 package command
 
 import (
+	"fmt"
 	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/contract"
 )
 
 // helpCommand show current envionment
-var helpCommand = &cobra.Command{
-	Use:   "help",
-	Short: "get help info",
+var DemoCommand = &cobra.Command{
+	Use:   "demo",
+	Short: "demo for framework",
 	Run: func(c *cobra.Command, args []string) {
-		cmd, _, e := c.Root().Find(args)
-		if cmd == nil || e != nil {
-			c.Printf("Unknown help topic %#q\n", args)
-			c.Root().Usage()
-		} else {
-			cmd.InitDefaultHelpFlag() // make possible 'help' flag to be shown
-			cmd.Help()
-		}
+		container := c.GetContainer()
+		appService := container.MustMake(contract.AppKey).(contract.App)
+		fmt.Println("app base folder:", appService.BaseFolder())
 	},
 }

@@ -26,7 +26,7 @@ func (provider *HadeTraceProvider) IsDefer() bool {
 }
 
 // Params define the necessary params for NewInstance
-func (provider *HadeTraceProvider) Params() []interface{} {
+func (provider *HadeTraceProvider) Params(c framework.Container) []interface{} {
 	return []interface{}{provider.c}
 }
 

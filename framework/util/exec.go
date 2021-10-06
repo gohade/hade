@@ -5,7 +5,7 @@ import (
 	"syscall"
 )
 
-// 获取当前执行程序目录
+// GetExecDirectory 获取当前执行程序目录
 func GetExecDirectory() string {
 	file, err := os.Getwd()
 	if err == nil {
@@ -14,7 +14,7 @@ func GetExecDirectory() string {
 	return ""
 }
 
-// Will return true if the process with PID exists.
+// CheckProcessExist Will return true if the process with PID exists.
 func CheckProcessExist(pid int) bool {
 	process, err := os.FindProcess(pid)
 	if err != nil {

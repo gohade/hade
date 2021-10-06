@@ -18,6 +18,12 @@ func init() {
 	SetMode(TestMode)
 }
 
+func BenchmarkParseAccept(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		parseAccept("text/html , application/xhtml+xml,application/xml;q=0.9,  */* ;q=0.8")
+	}
+}
+
 type testStruct struct {
 	T *testing.T
 }
@@ -79,9 +85,9 @@ func TestFilterFlags(t *testing.T) {
 	assert.Equal(t, "text/html", result)
 }
 
-// func TestFunctionName(t *testing.T) {
-// 	assert.Regexp(t, `^(.*/vendor/)?github.com/gin-gonic/gin.somefunction$`, nameOfFunction(somefunction))
-// }
+func TestFunctionName(t *testing.T) {
+	assert.Regexp(t, `^(.*/vendor/)?github.com/gohade/hade/framework/gin.somefunction$`, nameOfFunction(somefunction))
+}
 
 func somefunction() {
 	// this empty function is used by TestFunctionName()

@@ -2,24 +2,31 @@ package command
 
 import (
 	"fmt"
+	"github.com/AlecAivazis/survey/v2"
 	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gohade/hade/framework/cobra"
-	commandUtil "github.com/gohade/hade/framework/command/util"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/util"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/jianfengye/collection"
 	"github.com/pkg/errors"
 )
 
+// 初始化command相关命令
+func initCmdCommand() *cobra.Command {
+	cmdCommand.AddCommand(cmdListCommand)
+	cmdCommand.AddCommand(cmdCreateCommand)
+	return cmdCommand
+}
+
+// 二级命令
 var cmdCommand = &cobra.Command{
 	Use:   "command",
-	Short: "all about commond",
+	Short: "控制台命令相关",
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			c.Help()
@@ -28,9 +35,10 @@ var cmdCommand = &cobra.Command{
 	},
 }
 
+// cmdListCommand 列出所有的控制台命令
 var cmdListCommand = &cobra.Command{
 	Use:   "list",
-	Short: "show all command list",
+	Short: "列出所有控制台命令",
 	RunE: func(c *cobra.Command, args []string) error {
 		cmds := c.Root().Commands()
 		ps := [][]string{}
@@ -43,19 +51,20 @@ var cmdListCommand = &cobra.Command{
 	},
 }
 
+// cmdCreateCommand 创建一个业务控制台命令
 var cmdCreateCommand = &cobra.Command{
 	Use:     "new",
-	Aliases: []string{"create", "init"},
-	Short:   "create a command",
+	Aliases: []string{"create", "init"}, // 设置别名为 create init
+	Short:   "创建一个控制台命令",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
+		container := c.GetContainer()
 
-		fmt.Println("create a new command...")
+		fmt.Println("开始创建控制台命令...")
 		var name string
 		var file string
 		{
 			prompt := &survey.Input{
-				Message: "please input command name:",
+				Message: "请输入控制台命令名称:",
 			}
 			err := survey.AskOne(prompt, &name)
 			if err != nil {
@@ -64,7 +73,7 @@ var cmdCreateCommand = &cobra.Command{
 		}
 		{
 			prompt := &survey.Input{
-				Message: "please input file name(default: command name):",
+				Message: "请输入文件名称(默认: 同控制台命令):",
 			}
 			err := survey.AskOne(prompt, &file)
 			if err != nil {
@@ -79,14 +88,14 @@ var cmdCreateCommand = &cobra.Command{
 		// 判断文件不存在
 		app := container.MustMake(contract.AppKey).(contract.App)
 
-		pFolder := filepath.Join(app.BasePath(), "app", "console", "command")
+		pFolder := app.CommandFolder()
 		subFolders, err := util.SubDir(pFolder)
 		if err != nil {
 			return err
 		}
 		subColl := collection.NewStrCollection(subFolders)
 		if subColl.Contains(file + ".go") {
-			fmt.Println("the file is existed")
+			fmt.Println("文件", file+".go", "已存在")
 			return nil
 		}
 
@@ -103,26 +112,26 @@ var cmdCreateCommand = &cobra.Command{
 			return errors.Cause(err)
 		}
 
-		fmt.Println("create new command success，file path:", filepath.Join(pFolder, file+".go"))
-		fmt.Println("please remember add command to console/kernel.go")
+		fmt.Println("创建新命令行工具成功，路径:", filepath.Join(pFolder, file+".go"))
+		fmt.Println("请记得开发完成后将命令行工具挂载到 console/kernel.go")
 		return nil
 	},
 }
 
+// 命令行工具模版
 var cmdTmpl string = `package command
 
 import (
 	"fmt"
 
 	"github.com/gohade/hade/framework/cobra"
-	"github.com/gohade/hade/framework/command/util"
 )
 
 var {{.|title}}Command = &cobra.Command{
 	Use:   "{{.}}",
 	Short: "{{.}}",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := util.GetContainer(c.Root())
+        container := c.GetContainer()
 		fmt.Println(container)
 		return nil
 	},

@@ -7,22 +7,25 @@ import (
 	"github.com/gohade/hade/framework/contract"
 )
 
+// HadeConsoleLog 代表控制台输出
 type HadeConsoleLog struct {
 	HadeLog
 }
 
+// NewHadeConsoleLog 实例化HadeConsoleLog
 func NewHadeConsoleLog(params ...interface{}) (interface{}, error) {
-	level := params[0].(contract.LogLevel)
-	ctxFielder := params[1].(contract.CtxFielder)
-	formatter := params[2].(contract.Formatter)
-	c := params[4].(framework.Container)
+	c := params[0].(framework.Container)
+	level := params[1].(contract.LogLevel)
+	ctxFielder := params[2].(contract.CtxFielder)
+	formatter := params[3].(contract.Formatter)
 
 	log := &HadeConsoleLog{}
 
 	log.SetLevel(level)
-	log.SetCxtFielder(ctxFielder)
+	log.SetCtxFielder(ctxFielder)
 	log.SetFormatter(formatter)
 
+	// 最重要的将内容输出到控制台
 	log.SetOutput(os.Stdout)
 	log.c = c
 	return log, nil

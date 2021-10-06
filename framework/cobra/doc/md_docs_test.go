@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gohade/hade/framework/cobra"
+	"github.com/spf13/cobra"
 )
 
 func TestGenMdDoc(t *testing.T) {
@@ -26,6 +26,20 @@ func TestGenMdDoc(t *testing.T) {
 	checkStringContains(t, output, echoSubCmd.Short)
 	checkStringOmits(t, output, deprecatedCmd.Short)
 	checkStringContains(t, output, "Options inherited from parent commands")
+}
+
+func TestGenMdDocWithNoLongOrSynopsis(t *testing.T) {
+	// We generate on subcommand so we have both subcommands and parents.
+	buf := new(bytes.Buffer)
+	if err := GenMarkdown(dummyCmd, buf); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	checkStringContains(t, output, dummyCmd.Example)
+	checkStringContains(t, output, dummyCmd.Short)
+	checkStringContains(t, output, "Options inherited from parent commands")
+	checkStringOmits(t, output, "### Synopsis")
 }
 
 func TestGenMdNoHiddenParents(t *testing.T) {

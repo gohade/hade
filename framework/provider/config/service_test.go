@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/gohade/hade/framework/contract"
-	"github.com/gohade/hade/tests"
+	tests "github.com/gohade/hade/test"
 
 	. "github.com/smartystreets/goconvey/convey"
 )

@@ -1,245 +1,78 @@
 package command
 
 import (
-	"fmt"
-	"io/ioutil"
+	"context"
+	"github.com/gohade/hade/framework/cobra"
+	"github.com/gohade/hade/framework/contract"
+	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"path/filepath"
-	"strconv"
+	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/gohade/hade/framework/cobra"
-	commandUtil "github.com/gohade/hade/framework/command/util"
-	"github.com/gohade/hade/framework/contract"
-	"github.com/gohade/hade/framework/util"
-
-	"github.com/erikdubbelboer/gspt"
-	"github.com/sevlyar/go-daemon"
 )
 
-var appDeamon = false
+// app启动地址
 var appAddress = ""
 
+// initAppCommand 初始化app命令和其子命令
 func initAppCommand() *cobra.Command {
+	appStartCommand.Flags().StringVar(&appAddress, "address", ":8888", "设置app启动的地址，默认为:8888")
 
-	appStartCommand.Flags().BoolVarP(&appDeamon, "deamon", "d", false, "start app deamon")
-	appStartCommand.Flags().StringVar(&appAddress, "address", "", "set app address")
 	appCommand.AddCommand(appStartCommand)
-	appCommand.AddCommand(appRestartCommand)
-	appCommand.AddCommand(appStateCommand)
-	appCommand.AddCommand(appStopCommand)
-
 	return appCommand
 }
 
+// AppCommand 是命令行参数第一级为app的命令，它没有实际功能，只是打印帮助文档
 var appCommand = &cobra.Command{
 	Use:   "app",
-	Short: "start app serve",
+	Short: "业务应用控制命令",
+	Long:  "业务应用控制命令，其包含业务启动，关闭，重启，查询等功能",
 	RunE: func(c *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			c.Help()
-		}
+		// 打印帮助文档
+		c.Help()
 		return nil
 	},
 }
 
-// appCommand start a app app
+// appStartCommand 启动一个Web服务
 var appStartCommand = &cobra.Command{
 	Use:   "start",
-	Short: "start app server",
+	Short: "启动一个Web服务",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
-		configService := container.MustMake(contract.ConfigKey).(contract.Config)
+		// 从Command中获取服务容器
+		container := c.GetContainer()
+		// 从服务容器中获取kernel的服务实例
 		kernelService := container.MustMake(contract.KernelKey).(contract.Kernel)
+		// 从kernel服务实例中获取引擎
+		core := kernelService.HttpEngine()
 
-		appURL := configService.GetString("app.url")
-		if appAddress != "" {
-			appURL = appAddress
+		// 创建一个Server服务
+		server := &http.Server{
+			Handler: core,
+			Addr:    appAddress,
 		}
 
-		if appURL == "" {
-			appURL = "http://localhost:8080"
+		// 这个goroutine是启动服务的goroutine
+		go func() {
+			server.ListenAndServe()
+		}()
+
+		// 当前的goroutine等待信号量
+		quit := make(chan os.Signal)
+		// 监控信号：SIGINT, SIGTERM, SIGQUIT
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		// 这里会阻塞当前goroutine等待信号
+		<-quit
+
+		// 调用Server.Shutdown graceful结束
+		timeoutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := server.Shutdown(timeoutCtx); err != nil {
+			log.Fatal("Server Shutdown:", err)
 		}
 
-		r := kernelService.HttpEngine()
-
-		hadeURL, err := url.Parse(appURL)
-		if err != nil {
-			return err
-		}
-		hadeServer := &http.Server{
-			Addr:    fmt.Sprintf("%s:%s", hadeURL.Hostname(), hadeURL.Port()),
-			Handler: r,
-		}
-
-		pidFolder := appService.PidPath()
-		if !util.Exists(pidFolder) {
-			os.MkdirAll(pidFolder, os.ModePerm)
-		}
-		serverPidFile := filepath.Join(pidFolder, "app.pid")
-		logFolder := appService.LogPath()
-		if !util.Exists(logFolder) {
-			os.MkdirAll(logFolder, os.ModePerm)
-		}
-		// 应用日志
-		serverLogFile := filepath.Join(logFolder, "app.log")
-		currentFolder := util.GetExecDirectory()
-		// deamon mode
-		if appDeamon {
-			cntxt := &daemon.Context{
-				PidFileName: serverPidFile,
-				PidFilePerm: 0664,
-				LogFileName: serverLogFile,
-				LogFilePerm: 0640,
-				WorkDir:     currentFolder,
-				Umask:       027,
-				Args:        []string{"", "app", "start", "--deamon=true"},
-			}
-			d, err := cntxt.Reborn()
-			if err != nil {
-				return err
-			}
-			if d != nil {
-				fmt.Println("app serve started")
-				fmt.Println("log file:", serverLogFile)
-				return nil
-			}
-			defer cntxt.Release()
-			fmt.Println("deamon started")
-			gspt.SetProcTitle("hade app")
-			err = hadeServer.ListenAndServe()
-			if err != nil {
-				fmt.Println(err)
-			}
-			return nil
-		}
-
-		// 记录app.pid
-		content := strconv.Itoa(os.Getpid())
-		fmt.Println("[PID]", content)
-		err = ioutil.WriteFile(serverPidFile, []byte(content), 0644)
-		if err != nil {
-			return err
-		}
-		gspt.SetProcTitle("hade app")
-
-		fmt.Println("app serve url:", appURL)
-		err = hadeServer.ListenAndServe()
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		return nil
-	},
-}
-
-var appRestartCommand = &cobra.Command{
-	Use:   "restart",
-	Short: "restart app server",
-	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
-
-		// GetPid
-		serverPidFile := filepath.Join(appService.PidPath(), "app.pid")
-
-		content, err := ioutil.ReadFile(serverPidFile)
-		if err != nil {
-			return err
-		}
-
-		if content != nil && len(content) != 0 {
-			pid, err := strconv.Atoi(string(content))
-			if err != nil {
-				return err
-			}
-			if util.CheckProcessExist(pid) {
-				if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-					return err
-				}
-				if err := ioutil.WriteFile(serverPidFile, []byte{}, 0644); err != nil {
-					return err
-				}
-
-				// check process closed
-				for i := 0; i < 10; i++ {
-					if util.CheckProcessExist(pid) == false {
-						break
-					}
-					time.Sleep(1 * time.Second)
-				}
-
-				fmt.Println("kill process:" + strconv.Itoa(pid))
-			}
-		}
-
-		appDeamon = true
-		return appStartCommand.RunE(c, args)
-	},
-}
-
-var appStopCommand = &cobra.Command{
-	Use:   "stop",
-	Short: "stop app server",
-	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
-
-		// GetPid
-		serverPidFile := filepath.Join(appService.PidPath(), "app.pid")
-
-		content, err := ioutil.ReadFile(serverPidFile)
-		if err != nil {
-			return err
-		}
-
-		if content != nil && len(content) != 0 {
-			pid, err := strconv.Atoi(string(content))
-			if err != nil {
-				return err
-			}
-			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
-				return err
-			}
-			if err := ioutil.WriteFile(serverPidFile, []byte{}, 0644); err != nil {
-				return err
-			}
-			fmt.Println("stop pid:", pid)
-		}
-		return nil
-	},
-}
-
-var appStateCommand = &cobra.Command{
-	Use:   "state",
-	Short: "get app pid",
-	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
-
-		// GetPid
-		serverPidFile := filepath.Join(appService.PidPath(), "app.pid")
-
-		content, err := ioutil.ReadFile(serverPidFile)
-		if err != nil {
-			return err
-		}
-
-		if content != nil && len(content) > 0 {
-			pid, err := strconv.Atoi(string(content))
-			if err != nil {
-				return err
-			}
-			if util.CheckProcessExist(pid) {
-				fmt.Println("app server started, pid:", pid)
-				return nil
-			}
-		}
-		fmt.Println("no app server start")
 		return nil
 	},
 }

@@ -2,7 +2,6 @@ package demo
 
 import (
 	demoService "github.com/gohade/hade/app/provider/demo"
-
 	"github.com/gohade/hade/framework/gin"
 )
 
@@ -12,7 +11,7 @@ type DemoApi struct {
 
 func Register(r *gin.Engine) error {
 	api := NewDemoApi()
-	r.Container().Singleton(&demoService.DemoProvider{})
+	r.Bind(&demoService.DemoProvider{})
 
 	r.GET("/demo/demo", api.Demo)
 	r.GET("/demo/demo2", api.Demo2)
@@ -33,9 +32,7 @@ func NewDemoApi() *DemoApi {
 // @Success 200 array []UserDTO
 // @Router /demo/demo [get]
 func (api *DemoApi) Demo(c *gin.Context) {
-	users := api.service.GetUsers()
-	usersDTO := UserModelsToUserDTOs(users)
-	c.JSON(200, usersDTO)
+	c.JSON(200, "this is demo for dev all")
 }
 
 // Demo godoc

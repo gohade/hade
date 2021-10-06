@@ -16,17 +16,21 @@ import (
 
 var newForce bool
 var newGoMod string
+var newVersion string
 
+// new相关的名称
 func initNewCommand() *cobra.Command {
 	newCommand.Flags().BoolVarP(&newForce, "force", "f", false, "if app exist, overwrite app, default: false")
 	newCommand.Flags().StringVarP(&newGoMod, "mod", "m", "", "go mod name, default: folder name")
+	newCommand.Flags().StringVarP(&newVersion, "version", "v", "", "newVersion, default: 最新版本version")
 	return newCommand
 }
 
+// 创建一个新应用
 var newCommand = &cobra.Command{
 	Use:     "new [folder]",
 	Aliases: []string{"create", "init"},
-	Short:   "create a new app",
+	Short:   "创建一个新的应用",
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			return errors.New("参数错误")
@@ -40,7 +44,7 @@ var newCommand = &cobra.Command{
 			if newForce {
 				os.RemoveAll(folder)
 			} else {
-				return errors.New("app has exist, please delete first")
+				return errors.New("应用目录已经存在，请先删除目录")
 			}
 		}
 
@@ -49,23 +53,23 @@ var newCommand = &cobra.Command{
 		}
 
 		// 拷贝template项目
-		url := "https://hade-template/-/archive/master/hade-template-master.zip"
-		err := util.DownloadFile("hade-template-master.zip", url)
+		url := "https://github.com/gohade/template/archive/main.zip"
+		err := util.DownloadFile("template-main.zip", url)
 		if err != nil {
 			return err
 		}
 
-		_, err = util.Unzip("hade-template-master.zip", "/tmp/")
+		_, err = util.Unzip("template-main.zip", currentPath)
 		if err != nil {
 			return err
 		}
 
 		// TODO: check do not use tmp file
-		if err := os.Rename("/tmp/hade-template-master/", folder); err != nil {
+		if err := os.Rename(filepath.Join(currentPath, "/template-main"), folder); err != nil {
 			return err
 		}
 
-		if err := os.Remove("hade-template-master.zip"); err != nil {
+		if err := os.Remove("template-main.zip"); err != nil {
 			return err
 		}
 		fmt.Println("remove " + path.Join(folder, ".git"))
