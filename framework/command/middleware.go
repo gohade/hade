@@ -19,8 +19,6 @@ import (
 	"github.com/gohade/hade/framework/contract"
 )
 
-var ginPath string = "github.com/gohade/hade/framework/gin"
-
 // 初始化中间件相关命令
 func initMiddlewareCommand() *cobra.Command {
 	middlewareCommand.AddCommand(middlewareAllCommand)
@@ -70,16 +68,22 @@ var middlewareMigrateCommand = &cobra.Command{
 	Use:   "migrate",
 	Short: "迁移gin-contrib中间件, 迁移地址：https://github.com/gin-contrib/[middleware].git",
 	RunE: func(c *cobra.Command, args []string) error {
-		// step1 : read args
-		if len(args) != 1 {
-			return errors.New("args lens invalid")
-		}
-		repo := args[0]
-		// step2 : download git to middleware sub directory
 		container := c.GetContainer()
+		fmt.Println("迁移一个Gin中间件")
+		var repo string
+		{
+			prompt := &survey.Input{
+				Message: "请输入中间件名称：",
+			}
+			err := survey.AskOne(prompt, &repo)
+			if err != nil {
+				return err
+			}
+		}
+		// step2 : 下载git到一个目录中
 		appService := container.MustMake(contract.AppKey).(contract.App)
 
-		middlewarePath := path.Join(appService.BaseFolder(), "app", "http", "middleware")
+		middlewarePath := appService.MiddlewareFolder()
 		url := "https://github.com/gin-contrib/" + repo + ".git"
 		fmt.Println("下载中间件 gin-contrib:")
 		fmt.Println(url)
@@ -91,7 +95,7 @@ var middlewareMigrateCommand = &cobra.Command{
 			return err
 		}
 
-		// step4 : remove go.mod and go.sum and .git
+		// step3:删除不必要的文件 go.mod, go.sum, .git
 		repoFolder := path.Join(middlewarePath, repo)
 		fmt.Println("remove " + path.Join(repoFolder, "go.mod"))
 		os.Remove(path.Join(repoFolder, "go.mod"))
@@ -100,9 +104,8 @@ var middlewareMigrateCommand = &cobra.Command{
 		fmt.Println("remove " + path.Join(repoFolder, ".git"))
 		os.RemoveAll(path.Join(repoFolder, ".git"))
 
-		// step3 : replace key words
+		// step4 : 替换关键词
 		filepath.Walk(repoFolder, func(path string, info os.FileInfo, err error) error {
-			fmt.Println("read file:" + path)
 			if info.IsDir() {
 				return nil
 			}
@@ -117,8 +120,8 @@ var middlewareMigrateCommand = &cobra.Command{
 			}
 			isContain := bytes.Contains(c, []byte("github.com/gin-gonic/gin"))
 			if isContain {
-				fmt.Println("update file:" + path)
-				c = bytes.ReplaceAll(c, []byte("github.com/gin-gonic/gin"), []byte(ginPath))
+				fmt.Println("更新文件:" + path)
+				c = bytes.ReplaceAll(c, []byte("github.com/gin-gonic/gin"), []byte("github.com/gohade/hade/framework/gin"))
 				err = ioutil.WriteFile(path, c, 0644)
 				if err != nil {
 					return err

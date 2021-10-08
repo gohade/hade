@@ -1,4 +1,4 @@
-package command
+package foo
 
 import (
 	"fmt"
@@ -6,9 +6,9 @@ import (
 	"github.com/gohade/hade/framework/cobra"
 )
 
-var Demo2Command = &cobra.Command{
-	Use:   "demo2",
-	Short: "demo2",
+var FooCommand = &cobra.Command{
+	Use:   "foo",
+	Short: "foo",
 	RunE: func(c *cobra.Command, args []string) error {
         container := c.GetContainer()
 		fmt.Println(container)

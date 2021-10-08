@@ -1,6 +1,6 @@
-package demo2
+package user
 
-const Demo2Key = "demo2"
+const UserKey = "user"
 
 type Service interface {
 	// 请在这里定义你的方法

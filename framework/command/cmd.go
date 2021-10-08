@@ -61,7 +61,7 @@ var cmdCreateCommand = &cobra.Command{
 
 		fmt.Println("开始创建控制台命令...")
 		var name string
-		var file string
+		var folder string
 		{
 			prompt := &survey.Input{
 				Message: "请输入控制台命令名称:",
@@ -73,16 +73,16 @@ var cmdCreateCommand = &cobra.Command{
 		}
 		{
 			prompt := &survey.Input{
-				Message: "请输入文件名称(默认: 同控制台命令):",
+				Message: "请输入文件夹名称(默认: 同控制台命令):",
 			}
-			err := survey.AskOne(prompt, &file)
+			err := survey.AskOne(prompt, &folder)
 			if err != nil {
 				return err
 			}
 		}
 
-		if file == "" {
-			file = name
+		if folder == "" {
+			folder = name
 		}
 
 		// 判断文件不存在
@@ -94,32 +94,42 @@ var cmdCreateCommand = &cobra.Command{
 			return err
 		}
 		subColl := collection.NewStrCollection(subFolders)
-		if subColl.Contains(file + ".go") {
-			fmt.Println("文件", file+".go", "已存在")
+		if subColl.Contains(folder) {
+			fmt.Println("目录名称已经存在")
 			return nil
 		}
 
 		// 开始创建文件
+		if err := os.Mkdir(filepath.Join(pFolder, folder), 0700); err != nil {
+			return err
+		}
+
+		// 创建title这个模版方法
 		funcs := template.FuncMap{"title": strings.Title}
-		cmdFile := filepath.Join(pFolder, file+".go")
-		f, err := os.Create(cmdFile)
-		if err != nil {
-			return errors.Cause(err)
+		{
+			//  创建name.go
+			file := filepath.Join(pFolder, folder, name+".go")
+			f, err := os.Create(file)
+			if err != nil {
+				return errors.Cause(err)
+			}
+
+			// 使用contractTmp模版来初始化template，并且让这个模版支持title方法，即支持{{.|title}}
+			t := template.Must(template.New("cmd").Funcs(funcs).Parse(cmdTmpl))
+			// 将name传递进入到template中渲染，并且输出到contract.go 中
+			if err := t.Execute(f, name); err != nil {
+				return errors.Cause(err)
+			}
 		}
 
-		t := template.Must(template.New("cmd").Funcs(funcs).Parse(cmdTmpl))
-		if err := t.Execute(f, name); err != nil {
-			return errors.Cause(err)
-		}
-
-		fmt.Println("创建新命令行工具成功，路径:", filepath.Join(pFolder, file+".go"))
+		fmt.Println("创建新命令行工具成功，路径:", filepath.Join(pFolder, folder))
 		fmt.Println("请记得开发完成后将命令行工具挂载到 console/kernel.go")
 		return nil
 	},
 }
 
 // 命令行工具模版
-var cmdTmpl string = `package command
+var cmdTmpl string = `package {{.}}
 
 import (
 	"fmt"
