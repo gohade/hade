@@ -1,0 +1,63 @@
+basePath: /
+definitions:
+  demo.UserDTO:
+    properties:
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
+info:
+  contact:
+    email: yejianfeng
+    name: yejianfeng1
+  description: hade测试
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: https://github.com/swaggo/swag
+  title: hade
+  version: "1.1"
+paths:
+  /demo/demo:
+    get:
+      description: 获取所有用户
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              items:
+                $ref: '#/definitions/demo.UserDTO'
+              type: array
+            type: array
+      summary: 获取所有用户
+      tags:
+      - demo
+  /demo/demo2:
+    get:
+      description: 获取所有学生,不进行分页
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/demo.UserDTO'
+            type: array
+      summary: 获取所有学生
+      tags:
+      - demo
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+  BasicAuth:
+    type: basic
+swagger: "2.0"
+x-extension-openapi:
+  example: value on a json format

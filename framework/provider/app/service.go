@@ -115,11 +115,27 @@ func (app HadeApp) TestFolder() string {
 	return filepath.Join(app.BaseFolder(), "test")
 }
 
+<<<<<<< HEAD
 // NewHadeApp 初始化HadeApp
 func NewHadeApp(params ...interface{}) (interface{}, error) {
 	if len(params) != 2 {
 		return nil, errors.New("param error")
 	}
+=======
+// DeployFolder 定义测试需要的信息
+func (app HadeApp) DeployFolder() string {
+	if val, ok := app.configMap["deploy_folder"]; ok {
+		return val
+	}
+	return filepath.Join(app.BaseFolder(), "deploy")
+}
+
+// NewHadeApp 初始化HadeApp
+func NewHadeApp(params ...interface{}) (interface{}, error) {
+	if len(params) != 2 {
+		return nil, errors.New("param error")
+	}
+>>>>>>> master
 
 	// 有两个参数，一个是容器，一个是baseFolder
 	container := params[0].(framework.Container)

@@ -23,26 +23,24 @@ func TestHadeConfig_Normal(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		conf := c.MustMake(contract.ConfigKey).(contract.Config)
-		So(conf.GetString("database.mysql.hostname"), ShouldEqual, "127.0.0.1")
-		So(conf.GetInt("database.mysql.timeout"), ShouldEqual, 1)
-		So(conf.GetFloat64("database.mysql.readtime"), ShouldEqual, 2.3)
+		So(conf.GetString("database.default.host"), ShouldEqual, "localhost")
+		So(conf.GetInt("database.default.port"), ShouldEqual, 3306)
+		//So(conf.GetFloat64("database.default.readtime"), ShouldEqual, 2.3)
 		// So(conf.GetString("database.mysql.password"), ShouldEqual, "mypassword")
 
-		maps := conf.GetStringMap("database.mysql")
-		So(maps, ShouldContainKey, "hostname")
-		So(maps["timeout"], ShouldEqual, 1)
+		maps := conf.GetStringMap("database.default")
+		So(maps, ShouldContainKey, "host")
+		So(maps["host"], ShouldEqual, "localhost")
 
-		maps2 := conf.GetStringMapString("databse.mysql")
-		So(maps2["timeout"], ShouldEqual, "")
+		maps2 := conf.GetStringMapString("database.default")
+		So(maps2["host"], ShouldEqual, "localhost")
 
 		type Mysql struct {
-			Hostname string
-			Username string
+			Host string `yaml:"host"`
 		}
 		ms := &Mysql{}
-		err = conf.Load("database.mysql", ms)
-		Println(ms)
+		err = conf.Load("database.default", ms)
 		So(err, ShouldBeNil)
-		So(ms.Hostname, ShouldEqual, "127.0.0.1")
+		So(ms.Host, ShouldEqual, "localhost")
 	})
 }

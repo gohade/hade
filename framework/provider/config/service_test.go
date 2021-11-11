@@ -11,13 +11,17 @@ import (
 )
 
 func TestHadeConfig_GetInt(t *testing.T) {
+	container := tests.InitBaseContainer()
+
 	Convey("test hade env normal case", t, func() {
-		basePath := tests.BasePath
-		folder := filepath.Join(basePath, "config")
-		serv, err := NewHadeConfig(folder, map[string]string{}, contract.EnvDevelopment)
+		appService := container.MustMake(contract.AppKey).(contract.App)
+		envService := container.MustMake(contract.EnvKey).(contract.Env)
+		folder := filepath.Join(appService.ConfigFolder(), envService.AppEnv())
+
+		serv, err := NewHadeConfig(container, folder, map[string]string{})
 		So(err, ShouldBeNil)
 		conf := serv.(*HadeConfig)
-		timeout := conf.GetInt("database.mysql.timeout")
-		So(timeout, ShouldEqual, 1)
+		timeout := conf.GetString("database.default.timeout")
+		So(timeout, ShouldEqual, "10s")
 	})
 }

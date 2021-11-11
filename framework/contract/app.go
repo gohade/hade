@@ -26,6 +26,11 @@ type App interface {
 	RuntimeFolder() string
 	// TestFolder 存放测试所需要的信息
 	TestFolder() string
+<<<<<<< HEAD
+=======
+	// DeployFolder 存放部署的时候创建的文件夹
+	DeployFolder() string
+>>>>>>> master
 
 	// AppFolder 定义业务代码所在的目录，用于监控文件变更使用
 	AppFolder() string
