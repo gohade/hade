@@ -2,26 +2,32 @@ package command
 
 import (
 	"fmt"
-	"html/template"
+	"github.com/AlecAivazis/survey/v2"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
+	"text/template"
 
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/cobra"
-	commandUtil "github.com/gohade/hade/framework/command/util"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/util"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/jianfengye/collection"
 	"github.com/pkg/errors"
 )
 
+// 初始化provider相关服务
+func initProviderCommand() *cobra.Command {
+	providerCommand.AddCommand(providerCreateCommand)
+	providerCommand.AddCommand(providerListCommand)
+	return providerCommand
+}
+
+// providerCommand 二级命令
 var providerCommand = &cobra.Command{
 	Use:   "provider",
-	Short: "about hade service provider",
+	Short: "服务提供相关命令",
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			c.Help()
@@ -30,13 +36,16 @@ var providerCommand = &cobra.Command{
 	},
 }
 
+// providerListCommand 列出容器内的所有服务
 var providerListCommand = &cobra.Command{
 	Use:   "list",
-	Short: "list all installed providers",
+	Short: "列出容器内的所有服务",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
+		container := c.GetContainer()
 		hadeContainer := container.(*framework.HadeContainer)
-		list := hadeContainer.PrintList()
+		// 获取字符串凭证
+		list := hadeContainer.NameList()
+		// 打印
 		for _, line := range list {
 			println(line)
 		}
@@ -44,19 +53,19 @@ var providerListCommand = &cobra.Command{
 	},
 }
 
+// providerCreateCommand 创建一个新的服务，包括服务提供者，服务接口协议，服务实例
 var providerCreateCommand = &cobra.Command{
 	Use:     "new",
 	Aliases: []string{"create", "init"},
-	Short:   "create a provider",
+	Short:   "创建一个服务",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-
-		fmt.Println("create a provider")
+		container := c.GetContainer()
+		fmt.Println("创建一个服务")
 		var name string
 		var folder string
 		{
 			prompt := &survey.Input{
-				Message: "please input provider name",
+				Message: "请输入服务名称(服务凭证)：",
 			}
 			err := survey.AskOne(prompt, &name)
 			if err != nil {
@@ -65,7 +74,7 @@ var providerCreateCommand = &cobra.Command{
 		}
 		{
 			prompt := &survey.Input{
-				Message: "please input provider folder(default: provider name):",
+				Message: "请输入服务所在目录名称(默认: 同服务名称):",
 			}
 			err := survey.AskOne(prompt, &folder)
 			if err != nil {
@@ -73,11 +82,11 @@ var providerCreateCommand = &cobra.Command{
 			}
 		}
 
-		// check is provider exist
-		providers := container.(*framework.HadeContainer).PrintList()
+		// 检查服务是否存在
+		providers := container.(*framework.HadeContainer).NameList()
 		providerColl := collection.NewStrCollection(providers)
 		if providerColl.Contains(name) {
-			fmt.Println("provider name is existed")
+			fmt.Println("服务名称已经存在")
 			return nil
 		}
 
@@ -87,14 +96,14 @@ var providerCreateCommand = &cobra.Command{
 
 		app := container.MustMake(contract.AppKey).(contract.App)
 
-		pFolder := filepath.Join(app.BasePath(), "app", "provider")
+		pFolder := app.ProviderFolder()
 		subFolders, err := util.SubDir(pFolder)
 		if err != nil {
 			return err
 		}
 		subColl := collection.NewStrCollection(subFolders)
 		if subColl.Contains(folder) {
-			fmt.Println("provider folder is existed")
+			fmt.Println("目录名称已经存在")
 			return nil
 		}
 
@@ -102,22 +111,25 @@ var providerCreateCommand = &cobra.Command{
 		if err := os.Mkdir(filepath.Join(pFolder, folder), 0700); err != nil {
 			return err
 		}
+		// 创建title这个模版方法
 		funcs := template.FuncMap{"title": strings.Title}
 		{
-			//  contract.go
+			//  创建contract.go
 			file := filepath.Join(pFolder, folder, "contract.go")
 			f, err := os.Create(file)
 			if err != nil {
 				return errors.Cause(err)
 			}
 
+			// 使用contractTmp模版来初始化template，并且让这个模版支持title方法，即支持{{.|title}}
 			t := template.Must(template.New("contract").Funcs(funcs).Parse(contractTmp))
+			// 将name传递进入到template中渲染，并且输出到contract.go 中
 			if err := t.Execute(f, name); err != nil {
 				return errors.Cause(err)
 			}
 		}
 		{
-			//  provider.go
+			// 创建provider.go
 			file := filepath.Join(pFolder, folder, "provider.go")
 			f, err := os.Create(file)
 			if err != nil {
@@ -129,7 +141,7 @@ var providerCreateCommand = &cobra.Command{
 			}
 		}
 		{
-			//  service.go
+			//  创建service.go
 			file := filepath.Join(pFolder, folder, "service.go")
 			f, err := os.Create(file)
 			if err != nil {
@@ -140,8 +152,8 @@ var providerCreateCommand = &cobra.Command{
 				return err
 			}
 		}
-		fmt.Println("create provider success, folder path:", filepath.Join(pFolder, folder))
-		fmt.Println("please remember add provider to kernel")
+		fmt.Println("创建服务成功, 文件夹地址:", filepath.Join(pFolder, folder))
+		fmt.Println("请不要忘记挂载新创建的服务")
 		return nil
 	},
 }
@@ -151,7 +163,8 @@ var contractTmp string = `package {{.}}
 const {{.|title}}Key = "{{.}}"
 
 type Service interface {
-	// define some method here ...
+	// 请在这里定义你的方法
+    Foo() string
 }
 `
 
@@ -179,12 +192,11 @@ func (sp *{{.|title}}Provider) IsDefer() bool {
 	return false
 }
 
-func (sp *{{.|title}}Provider) Params() []interface{} {
-	return []interface{}{sp.c}
+func (sp *{{.|title}}Provider) Params(c framework.Container) []interface{} {
+	return []interface{}{c}
 }
 
 func (sp *{{.|title}}Provider) Boot(c framework.Container) error {
-	sp.c = c
 	return nil
 }
 
@@ -202,30 +214,8 @@ func New{{.|title}}Service(params ...interface{}) (interface{}, error) {
 	container := params[0].(framework.Container)
 	return &{{.|title}}Service{container: container}, nil
 }
+
+func (s *{{.|title}}Service) Foo() string {
+    return ""
+}
 `
-
-// TODO: provider 增加版本信息
-
-var providerDocCommand = &cobra.Command{
-	Use:   "doc",
-	Short: "show detail of one provider",
-	RunE: func(c *cobra.Command, args []string) error {
-		return nil
-	},
-}
-
-func providerDoc(provider framework.ServiceProvider) string {
-
-	// hade内置pkg: hade/framework/provider/app
-	// 自定义的pkg: hade/framework/provider/demo
-	pkgPath := reflect.TypeOf(provider).Elem().PkgPath()
-
-	// 获取对应的contract文件地址
-	return pkgPath
-
-	// 解析文件
-
-	// 判断其中的接口文件
-
-	// 生成文档
-}

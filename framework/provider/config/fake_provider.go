@@ -26,7 +26,7 @@ func (provider *FakeConfigProvider) IsDefer() bool {
 }
 
 // Params define the necessary params for NewInstance
-func (provider *FakeConfigProvider) Params() []interface{} {
+func (provider *FakeConfigProvider) Params(c framework.Container) []interface{} {
 	return []interface{}{provider.FileName, provider.Content}
 }
 

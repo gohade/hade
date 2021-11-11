@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gohade/hade/framework/cobra"
+	"github.com/spf13/cobra"
 )
 
 func TestGenYamlDoc(t *testing.T) {
@@ -55,6 +55,17 @@ func TestGenYamlTree(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(tmpdir, "do.yaml")); err != nil {
 		t.Fatalf("Expected file 'do.yaml' to exist")
 	}
+}
+
+func TestGenYamlDocRunnable(t *testing.T) {
+	// Testing a runnable command: should contain the "usage" field
+	buf := new(bytes.Buffer)
+	if err := GenYaml(rootCmd, buf); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	checkStringContains(t, output, "usage: "+rootCmd.Use)
 }
 
 func BenchmarkGenYamlToFile(b *testing.B) {

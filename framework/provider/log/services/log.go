@@ -11,25 +11,29 @@ import (
 	"github.com/gohade/hade/framework/provider/log/formatter"
 )
 
+// HadeLog 的通用实例
 type HadeLog struct {
-	level      contract.LogLevel
-	formatter  contract.Formatter
-	ctxFielder contract.CtxFielder
-
-	output io.Writer
-
-	c framework.Container
+	// 五个必要参数
+	level      contract.LogLevel   // 日志级别
+	formatter  contract.Formatter  // 日志格式化方法
+	ctxFielder contract.CtxFielder // ctx获取上下文字段
+	output     io.Writer           // 输出
+	c          framework.Container // 容器
 }
 
+// IsLevelEnable 判断这个级别是否可以打印
 func (log *HadeLog) IsLevelEnable(level contract.LogLevel) bool {
 	return level <= log.level
 }
 
+// logf 为打印日志的核心函数
 func (log *HadeLog) logf(level contract.LogLevel, ctx context.Context, msg string, fields map[string]interface{}) error {
+	// 先判断日志级别
 	if !log.IsLevelEnable(level) {
 		return nil
 	}
 
+	// 使用ctxFielder 获取context中的信息
 	fs := fields
 	if log.ctxFielder != nil {
 		t := log.ctxFielder(ctx)
@@ -40,6 +44,7 @@ func (log *HadeLog) logf(level contract.LogLevel, ctx context.Context, msg strin
 		}
 	}
 
+	// 如果绑定了trace服务，获取trace信息
 	if log.c.IsBind(contract.TraceKey) {
 		tracer := log.c.MustMake(contract.TraceKey).(contract.Trace)
 		tc := tracer.GetTrace(ctx)
@@ -51,6 +56,7 @@ func (log *HadeLog) logf(level contract.LogLevel, ctx context.Context, msg strin
 		}
 	}
 
+	// 将日志信息按照formatter序列化为字符串
 	if log.formatter == nil {
 		log.formatter = formatter.TextFormatter
 	}
@@ -59,22 +65,24 @@ func (log *HadeLog) logf(level contract.LogLevel, ctx context.Context, msg strin
 		return err
 	}
 
+	// 如果是panic级别，则使用log进行panic
 	if level == contract.PanicLevel {
 		pkgLog.Panicln(string(ct))
 		return nil
 	}
 
+	// 通过output进行输出
 	log.output.Write(ct)
 	log.output.Write([]byte("\r\n"))
 	return nil
 }
 
-// Set Output set out put file
+// SetOutput 设置output
 func (log *HadeLog) SetOutput(output io.Writer) {
 	log.output = output
 }
 
-// Panic will call panic(fields) for debug
+// Panic 输出panic的日志信息
 func (log *HadeLog) Panic(ctx context.Context, msg string, fields map[string]interface{}) {
 	log.logf(contract.PanicLevel, ctx, msg, fields)
 }
@@ -94,7 +102,7 @@ func (log *HadeLog) Warn(ctx context.Context, msg string, fields map[string]inte
 	log.logf(contract.WarnLevel, ctx, msg, fields)
 }
 
-// Info will add info record which contains msg and fields
+// Info 会打印出普通的日志信息
 func (log *HadeLog) Info(ctx context.Context, msg string, fields map[string]interface{}) {
 	log.logf(contract.InfoLevel, ctx, msg, fields)
 }
@@ -115,7 +123,7 @@ func (log *HadeLog) SetLevel(level contract.LogLevel) {
 }
 
 // SetCxtFielder will get fields from context
-func (log *HadeLog) SetCxtFielder(handler contract.CtxFielder) {
+func (log *HadeLog) SetCtxFielder(handler contract.CtxFielder) {
 	log.ctxFielder = handler
 }
 

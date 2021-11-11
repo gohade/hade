@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gohade/hade/framework/cobra"
+	"github.com/spf13/cobra"
 )
 
 func printOptionsReST(buf *bytes.Buffer, cmd *cobra.Command, name string) error {

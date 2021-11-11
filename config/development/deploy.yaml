@@ -1,11 +1,19 @@
-host: 127.0.0.1
-user: yejianfeng
-password: 123abc 
-rsa_key: 
-timeout: 1000
-remote_path: "/home/yejianfeng/"
-post_shell: 
-  - "./hade serve restart"
-  - "pwd"
-goos: linux
-goarch: amd64
+connections: # 要自动化部署的连接
+    - ssh.web-01
+
+remote_folder: "/home/yejianfeng/coredemo/"  # 远端的部署文件夹
+
+frontend: # 前端部署配置
+    pre_action: # 部署前置命令
+        - "pwd"
+    post_action: # 部署后置命令
+        - "pwd"
+
+backend: # 后端部署配置
+    goos: linux # 部署目标操作系统
+    goarch: amd64 # 部署目标cpu架构
+    pre_action: # 部署前置命令
+        - "rm /home/yejianfeng/coredemo/hade"
+    post_action: # 部署后置命令
+        - "chmod 777 /home/yejianfeng/coredemo/hade"
+        - "/home/yejianfeng/coredemo/hade app restart"

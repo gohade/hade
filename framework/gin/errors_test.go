@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/gohade/hade/framework/gin/internal/json"
-
 	"github.com/stretchr/testify/assert"
 )
 

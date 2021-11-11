@@ -7,11 +7,10 @@ definitions:
       name:
         type: string
     type: object
-host: 127.0.0.1:8067
 info:
   contact:
     email: yejianfeng
-    name: yejianfeng
+    name: yejianfeng1
   description: hade测试
   license:
     name: Apache 2.0
@@ -39,7 +38,7 @@ paths:
       - demo
   /demo/demo2:
     get:
-      description: 获取所有学生
+      description: 获取所有学生,不进行分页
       produces:
       - application/json
       responses:
@@ -47,9 +46,7 @@ paths:
           description: OK
           schema:
             items:
-              items:
-                $ref: '#/definitions/demo.UserDTO'
-              type: array
+              $ref: '#/definitions/demo.UserDTO'
             type: array
       summary: 获取所有学生
       tags:

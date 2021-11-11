@@ -1,0 +1,23 @@
+timeout: 3s
+network: tcp
+web-01:
+    host: 111.222.333.444 # ip地址
+    port: 22 # 端口
+    username: yejianfeng # 用户名
+    password: "123456" # 密码
+web-02:
+    network: tcp
+    host: localhost # ip地址
+    port: 3306 # 端口
+    username: jianfengye # 用户名
+    rsa_key: "/Users/user/.ssh/id_rsa"
+    known_hosts: "/Users/user/.ssh/known_hosts"
+
+
+#host: localhost # ip地址
+#port: 3306 # 端口
+#username: jianfengye # 用户名
+#password: "123456789" # 密码
+#rsa_key: "~/.ssh/id_rsa"
+#timeout: 1000
+#network: tcp

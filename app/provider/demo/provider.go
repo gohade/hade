@@ -22,7 +22,7 @@ func (sp *DemoProvider) IsDefer() bool {
 	return false
 }
 
-func (sp *DemoProvider) Params() []interface{} {
+func (sp *DemoProvider) Params(c framework.Container) []interface{} {
 	return []interface{}{sp.c}
 }
 
