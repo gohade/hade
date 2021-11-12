@@ -1,12 +1,8 @@
 package command
 
-<<<<<<< HEAD
-import "github.com/gohade/hade/framework/cobra"
-=======
 import (
 	"github.com/gohade/hade/framework/cobra"
 )
->>>>>>> master
 
 // AddKernelCommands will add all command/* to root command
 func AddKernelCommands(root *cobra.Command) {
@@ -34,17 +30,8 @@ func AddKernelCommands(root *cobra.Command) {
 	root.AddCommand(initMiddlewareCommand())
 	// new
 	root.AddCommand(initNewCommand())
-<<<<<<< HEAD
-	//
-	//// swagger
-	//swagger.IndexCommand.AddCommand(swagger.InitServeCommand())
-	//swagger.IndexCommand.AddCommand(swagger.GenCommand)
-	//root.AddCommand(swagger.IndexCommand)
-	//
-=======
 	// swagger
 	root.AddCommand(initSwaggerCommand())
 	// deploy
 	root.AddCommand(initDeployCommand())
->>>>>>> master
 }

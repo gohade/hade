@@ -1,22 +1,6 @@
 package command
 
 import (
-<<<<<<< HEAD
-	"fmt"
-	"github.com/sevlyar/go-daemon"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strconv"
-	"syscall"
-	"time"
-
-	"github.com/gohade/hade/framework/cobra"
-	"github.com/gohade/hade/framework/contract"
-	"github.com/gohade/hade/framework/util"
-
-	"github.com/erikdubbelboer/gspt"
-=======
     "fmt"
     "github.com/sevlyar/go-daemon"
     "io/ioutil"
@@ -29,7 +13,6 @@ import (
     "github.com/gohade/hade/framework/cobra"
     "github.com/gohade/hade/framework/contract"
     "github.com/gohade/hade/framework/util"
->>>>>>> master
 )
 
 var cronDaemon = false
@@ -124,11 +107,7 @@ var cronStartCommand = &cobra.Command{
 			// 子进程执行Cron.Run
 			defer cntxt.Release()
 			fmt.Println("daemon started")
-<<<<<<< HEAD
-			gspt.SetProcTitle("hade cron")
-=======
 			//gspt.SetProcTitle("hade cron")
->>>>>>> master
 			c.Root().Cron.Run()
 			return nil
 		}

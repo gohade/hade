@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-mysql:
-  hostname: 127.0.0.1
-  username: yejianfeng
-  password: 456789
-  timeout: 1
-  readtime: 2.3
-
-default:
-  driver: mysql
-  hostname: localhost
-  database: hade
-  username: root
-  password: "123456"
-  charset: utf8mb4
-  collation: utf8mb4_unicode_ci
-=======
 conn_max_idle: 10 # 通用配置，连接池最大空闲连接数
 conn_max_open: 100 # 通用配置，连接池最大连接数
 conn_max_lifetime: 1h # 通用配置，连接数最大生命周期
@@ -37,4 +20,3 @@ default:
     parse_time: true # 是否解析时间
     protocol: tcp # 传输协议
     loc: Local # 时区
->>>>>>> master

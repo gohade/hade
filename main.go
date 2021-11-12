@@ -15,12 +15,9 @@ import (
 	"github.com/gohade/hade/framework/provider/id"
 	"github.com/gohade/hade/framework/provider/kernel"
 	"github.com/gohade/hade/framework/provider/log"
-<<<<<<< HEAD
-=======
 	"github.com/gohade/hade/framework/provider/orm"
 	"github.com/gohade/hade/framework/provider/redis"
 	"github.com/gohade/hade/framework/provider/ssh"
->>>>>>> master
 	"github.com/gohade/hade/framework/provider/trace"
 )
 
@@ -36,11 +33,6 @@ func main() {
 	container.Bind(&id.HadeIDProvider{})
 	container.Bind(&trace.HadeTraceProvider{})
 	container.Bind(&log.HadeLogServiceProvider{})
-<<<<<<< HEAD
-
-	// 将HTTP引擎初始化,并且作为服务提供者绑定到服务容器中
-	if engine, err := http.NewHttpEngine(); err == nil {
-=======
 	container.Bind(&orm.GormProvider{})
 	container.Bind(&redis.RedisProvider{})
 	container.Bind(&cache.HadeCacheProvider{})
@@ -48,7 +40,6 @@ func main() {
 
 	// 将HTTP引擎初始化,并且作为服务提供者绑定到服务容器中
 	if engine, err := http.NewHttpEngine(container); err == nil {
->>>>>>> master
 		container.Bind(&kernel.HadeKernelProvider{HttpEngine: engine})
 	}
 

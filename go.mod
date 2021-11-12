@@ -11,11 +11,8 @@ require (
 	github.com/gin-contrib/sse v0.1.0
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/go-playground/validator/v10 v10.4.1
-<<<<<<< HEAD
-=======
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/go-sql-driver/mysql v1.6.0
->>>>>>> master
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-github/v39 v39.1.0
 	github.com/google/uuid v1.3.0
@@ -30,10 +27,7 @@ require (
 	github.com/mattn/go-isatty v0.0.12
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/pkg/errors v0.9.1
-<<<<<<< HEAD
-=======
 	github.com/pkg/sftp v1.13.4
->>>>>>> master
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/rs/xid v1.3.0
 	github.com/sevlyar/go-daemon v0.1.5
@@ -43,10 +37,6 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.8.1
 	github.com/stretchr/testify v1.7.0
-<<<<<<< HEAD
-	github.com/ugorji/go/codec v1.1.7
-	gopkg.in/yaml.v2 v2.4.0
-=======
 	github.com/swaggo/gin-swagger v1.3.2
 	github.com/swaggo/swag v1.7.3
 	github.com/ugorji/go/codec v1.1.7
@@ -59,5 +49,4 @@ require (
 	gorm.io/driver/sqlite v1.1.6
 	gorm.io/driver/sqlserver v1.1.0
 	gorm.io/gorm v1.21.16
->>>>>>> master
 )

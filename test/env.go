@@ -1,10 +1,5 @@
 package tests
 
-<<<<<<< HEAD
-const (
-	BasePath = "/Users/Documents/workspace/hade/"
-)
-=======
 import (
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/provider/app"
@@ -24,4 +19,3 @@ func InitBaseContainer() framework.Container {
 	container.Bind(&env.HadeTestingEnvProvider{})
 	return container
 }
->>>>>>> master

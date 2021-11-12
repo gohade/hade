@@ -9,10 +9,7 @@ yarn-error.log*
 selenium-debug.log
 hade
 storage
-<<<<<<< HEAD
-=======
 /deploy/
->>>>>>> master
 
 # Editor directories and files
 .idea
