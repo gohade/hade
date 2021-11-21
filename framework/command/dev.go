@@ -176,7 +176,7 @@ func (p *Proxy) restartBackend() error {
 	// 使用命令行启动后端进程
 	cmd := exec.Command(bin, "app", "start", "--address="+hadeAddress)
 
-	cmd.Stdout = os.NewFile(0, os.DevNull)
+	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	fmt.Println("启动后端服务: ", "http://127.0.0.1:"+port)
 	err := cmd.Start()
