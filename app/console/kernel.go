@@ -1,7 +1,6 @@
 package console
 
 import (
-    "github.com/gohade/hade/app/console/command/foo"
     "github.com/gohade/hade/framework"
     "github.com/gohade/hade/framework/cobra"
     "github.com/gohade/hade/framework/command"
@@ -40,7 +39,8 @@ func RunCommand(container framework.Container) error {
 // 绑定业务的命令
 func AddAppCommand(rootCmd *cobra.Command) {
 
-    rootCmd.AddCommand(foo.FooCommand)
+    //rootCmd.AddCommand(foo.FooCommand)
+    
     // 每秒调用一次Foo命令
     //rootCmd.AddCronCommand("* * * * * *", demo.FooCommand)
 
