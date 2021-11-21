@@ -170,8 +170,10 @@ func (p *Proxy) restartBackend() error {
 	// 设置随机端口，真实后端的端口
 	port := p.devConfig.Backend.Port
 	hadeAddress := fmt.Sprintf(":" + port)
+
+	bin := os.Args[0]
 	// 使用命令行启动后端进程
-	cmd := exec.Command("./hade", "app", "start", "--address="+hadeAddress)
+	cmd := exec.Command(bin, "app", "start", "--address="+hadeAddress)
 	cmd.Stdout = os.NewFile(0, os.DevNull)
 	cmd.Stderr = os.Stderr
 	fmt.Println("启动后端服务: ", "http://127.0.0.1:"+port)
