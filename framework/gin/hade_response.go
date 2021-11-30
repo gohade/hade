@@ -110,7 +110,7 @@ func (ctx *Context) IHtml(file string, obj interface{}) IResponse {
 // string
 func (ctx *Context) IText(format string, values ...interface{}) IResponse {
 	out := fmt.Sprintf(format, values...)
-	ctx.ISetHeader("Content-Type", "application/text")
+	ctx.ISetHeader("Content-Type", "application/json; charset=UTF-8")
 	ctx.Writer.Write([]byte(out))
 	return ctx
 }
