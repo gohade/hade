@@ -38,6 +38,7 @@ type DBConfig struct {
 	Password     string `yaml:"password"`      // 密码
 	Driver       string `yaml:"driver"`        // 驱动
 	Host         string `yaml:"host"`          // 数据库地址
+    AllowNativePasswords bool `yaml:"allow_native_passwords"` // 是否允许nativePassword
 
 	// 以下配置关于连接池
 	ConnMaxIdle     int    `yaml:"conn_max_idle"`     // 最大空闲连接数
@@ -68,6 +69,7 @@ func (conf *DBConfig) FormatDsn() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	driverConf := &mysql.Config{
 		User:         conf.Username,
 		Passwd:       conf.Password,
@@ -80,6 +82,7 @@ func (conf *DBConfig) FormatDsn() (string, error) {
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
 		ParseTime:    conf.ParseTime,
+        AllowNativePasswords: conf.AllowNativePasswords,
 	}
 	return driverConf.FormatDSN(), nil
 }
