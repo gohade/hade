@@ -5,34 +5,32 @@ import (
 	"github.com/gohade/hade/framework/contract"
 )
 
-// HadeAppProvider provide a App service, it must be singlton, and not delay
+// HadeAppProvider 提供App的具体实现方法
 type HadeAppProvider struct {
-	app *HadeApp
-
-	BasePath string
+	BaseFolder string
 }
 
-// Register registe a new function for make a service instance
-func (provider *HadeAppProvider) Register(c framework.Container) framework.NewInstance {
+// Register 注册HadeApp方法
+func (h *HadeAppProvider) Register(container framework.Container) framework.NewInstance {
 	return NewHadeApp
 }
 
-// Boot will called when the service instantiate
-func (provider *HadeAppProvider) Boot(c framework.Container) error {
+// Boot 启动调用
+func (h *HadeAppProvider) Boot(container framework.Container) error {
 	return nil
 }
 
-// IsDefer define whether the service instantiate when first make or register
-func (provider *HadeAppProvider) IsDefer() bool {
+// IsDefer 是否延迟初始化
+func (h *HadeAppProvider) IsDefer() bool {
 	return false
 }
 
-// Params define the necessary params for NewInstance
-func (provider *HadeAppProvider) Params() []interface{} {
-	return []interface{}{provider.BasePath}
+// Params 获取初始化参数
+func (h *HadeAppProvider) Params(container framework.Container) []interface{} {
+	return []interface{}{container, h.BaseFolder}
 }
 
-/// Name define the name for this service
-func (provider *HadeAppProvider) Name() string {
+// Name 获取字符串凭证
+func (h *HadeAppProvider) Name() string {
 	return contract.AppKey
 }

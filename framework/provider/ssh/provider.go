@@ -5,45 +5,31 @@ import (
 	"github.com/gohade/hade/framework/contract"
 )
 
-// HadeSSHProvider provide a App service, it must be singlton, and not delay
-type HadeSSHProvider struct {
-	Config *contract.SSHConfig
+// SSHProvider 提供App的具体实现方法
+type SSHProvider struct {
 }
 
-// Register registe a new function for make a service instance
-func (provider *HadeSSHProvider) Register(c framework.Container) framework.NewInstance {
+// Register 注册方法
+func (h *SSHProvider) Register(container framework.Container) framework.NewInstance {
 	return NewHadeSSH
 }
 
-// Boot will called when the service instantiate
-func (provider *HadeSSHProvider) Boot(c framework.Container) error {
-	if provider.Config == nil {
-		config := c.MustMake(contract.ConfigKey).(contract.Config)
-		if config.IsExist("ssh") {
-			provider.Config = &contract.SSHConfig{
-				User:     config.GetString("ssh.user"),
-				Password: config.GetString("ssh.password"),
-				Host:     config.GetString("ssh.host"),
-				Port:     config.GetString("ssh.port"),
-				RsaKey:   config.GetString("ssh.rsa_key"),
-				Timeout:  config.GetInt("ssh.timeout"),
-			}
-		}
-	}
+// Boot 启动调用
+func (h *SSHProvider) Boot(container framework.Container) error {
 	return nil
 }
 
-// IsDefer define whether the service instantiate when first make or register
-func (provider *HadeSSHProvider) IsDefer() bool {
+// IsDefer 是否延迟初始化
+func (h *SSHProvider) IsDefer() bool {
 	return true
 }
 
-// Params define the necessary params for NewInstance
-func (provider *HadeSSHProvider) Params() []interface{} {
-	return []interface{}{provider.Config}
+// Params 获取初始化参数
+func (h *SSHProvider) Params(container framework.Container) []interface{} {
+	return []interface{}{container}
 }
 
-/// Name define the name for this service
-func (provider *HadeSSHProvider) Name() string {
+// Name 获取字符串凭证
+func (h *SSHProvider) Name() string {
 	return contract.SSHKey
 }

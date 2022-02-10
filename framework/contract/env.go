@@ -1,27 +1,26 @@
 package contract
 
 const (
-	// EnvProduction represent the environment which build for production
+	// EnvProduction 代表生产环境
 	EnvProduction = "production"
-	// EnvTesting represent the environment which build for test
+	// EnvTesting 代表测试环境
 	EnvTesting = "testing"
-	// EnvDevelopment represent the environment which build for development
+	// EnvDevelopment 代表开发环境
 	EnvDevelopment = "development"
 
-	// EnvKey is the key in container
+	// EnvKey 是环境变量服务字符串凭证
 	EnvKey = "hade:env"
 )
 
-// Env define golang run enviornment
-// it set some config which want ignored in git
+// Env 定义环境变量的获取服务
 type Env interface {
-	// AppEnv get current environment
+	// AppEnv 获取当前的环境，建议分为development/testing/production
 	AppEnv() string
 
-	// IsExist check setting is exist
+	// IsExist 判断一个环境变量是否有被设置
 	IsExist(string) bool
-	// Get environment setting, if not exist, return ""
+	// Get 获取某个环境变量，如果没有设置，返回""
 	Get(string) string
-	// All return all settings
+	// All 获取所有的环境变量，.env和运行环境变量融合后结果
 	All() map[string]string
 }

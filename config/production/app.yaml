@@ -1,0 +1,11 @@
+url: http://127.0.0.1:8066
+
+swagger_open: true
+
+dev_fresh: 1
+
+path:
+  storage: "/hade_sts/testdata/storage/"
+  log: ""
+  pid: ""
+  cache: ""

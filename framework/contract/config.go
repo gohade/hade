@@ -7,39 +7,36 @@ const (
 	ConfigKey = "hade:config"
 )
 
-// Config define setting from files, it support key contains dov。
-// for example:
-// .Get("user.name")
-// suggest use yaml format, https://yaml.org/spec/1.2/spec.html
+// Config 定义了配置文件服务，读取配置文件，支持点分割的路径读取
+// 例如: .Get("app.name") 表示从app文件中读取name属性
+// 建议使用 yaml 属性, https://yaml.org/spec/1.2/spec.html
 type Config interface {
-	// IsExist check setting is exist
+	// IsExist 检查一个属性是否存在
 	IsExist(key string) bool
 
-	// Get a new interface
+	// Get 获取一个属性值
 	Get(key string) interface{}
-	// GetBool get bool type
+	// GetBool 获取一个bool属性
 	GetBool(key string) bool
-	// GetInt get Int type
+	// GetInt 获取一个int属性
 	GetInt(key string) int
-	// GetFloat64 get float64
+	// GetFloat64 获取一个float64属性
 	GetFloat64(key string) float64
-	// GetTime get time type
+	// GetTime 获取一个time属性
 	GetTime(key string) time.Time
-	// GetString get string typen
+	// GetString 获取一个string属性
 	GetString(key string) string
-
-	// GetIntSlice get int slice type
+	// GetIntSlice 获取一个int数组属性
 	GetIntSlice(key string) []int
-	// GetStringSlice get string slice type
+	// GetStringSlice 获取一个string数组
 	GetStringSlice(key string) []string
-
-	// GetStringMap get map which key is string, value is interface
+	// GetStringMap 获取一个string为key，interface为val的map
 	GetStringMap(key string) map[string]interface{}
-	// GetStringMapString get map which key is string, value is string
+	// GetStringMapString 获取一个string为key，string为val的map
 	GetStringMapString(key string) map[string]string
-	// GetStringMapStringSlice get map which key is string, value is string slice
+	// GetStringMapStringSlice 获取一个string为key，数组string为val的map
 	GetStringMapStringSlice(key string) map[string][]string
 
-	// Load a config to a struct, val should be an pointer
+	// Load 加载配置到某个对象
 	Load(key string, val interface{}) error
 }

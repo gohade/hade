@@ -2,82 +2,152 @@ package command
 
 import (
 	"fmt"
-	"log"
-	"math/rand"
+	"github.com/gohade/hade/framework"
+	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gohade/hade/framework/cobra"
-	commandUtil "github.com/gohade/hade/framework/command/util"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/util"
 
 	"github.com/fsnotify/fsnotify"
 )
 
-const (
-	frontendPrefix = "/dist"
-	swaggerPrefix  = "/swagger"
-)
+// devConfig 代表调试模式的配置信息
+type devConfig struct {
+	Port    string   // 调试模式最终监听的端口，默认为8070
+	Backend struct { // 后端调试模式配置
+		RefreshTime   int    // 调试模式后端更新时间，如果文件变更，等待3s才进行一次更新，能让频繁保存变更更为顺畅, 默认1s
+		Port          string // 后端监听端口， 默认 8072
+		MonitorFolder string // 监听文件夹，默认为AppFolder
+	}
+	Frontend struct { // 前端调试模式配置
+		Port string // 前端启动端口, 默认8071
+	}
+}
 
-var (
-	openSwagger bool
-	refreshTime int32
-	proxyURL    string
-)
+// 初始化配置文件
+func initDevConfig(c framework.Container) *devConfig {
+	// 设置默认值
+	devConfig := &devConfig{
+		Port: "8087",
+		Backend: struct {
+			RefreshTime   int
+			Port          string
+			MonitorFolder string
+		}{
+			1,
+			"8072",
+			"",
+		},
+		Frontend: struct {
+			Port string
+		}{
+			"8071",
+		},
+	}
+	// 容器中获取配置服务
+	configer := c.MustMake(contract.ConfigKey).(contract.Config)
 
-// Proxy 代表serve启动的backend的服务器代理
+	// 每个配置项进行检查
+	if configer.IsExist("app.dev.port") {
+		devConfig.Port = configer.GetString("app.dev.port")
+	}
+	if configer.IsExist("app.dev.backend.refresh_time") {
+		devConfig.Backend.RefreshTime = configer.GetInt("app.dev.backend.refresh_time")
+	}
+	if configer.IsExist("app.dev.backend.port") {
+		devConfig.Backend.Port = configer.GetString("app.dev.backend.port")
+	}
+
+	// monitorFolder 默认使用目录服务的AppFolder()
+	monitorFolder := configer.GetString("app.dev.backend.monitor_folder")
+	if monitorFolder == "" {
+		appService := c.MustMake(contract.AppKey).(contract.App)
+		devConfig.Backend.MonitorFolder = appService.AppFolder()
+	}
+
+	if configer.IsExist("app.dev.frontend.port") {
+		devConfig.Frontend.Port = configer.GetString("app.dev.frontend.port")
+	}
+	return devConfig
+}
+
+// Proxy 代表serve启动的服务器代理
 type Proxy struct {
-	// proxy信息
-	proxyURL     *url.URL
-	proxyServer  *http.Server
-	proxyReverse *httputil.ReverseProxy
+	devConfig   *devConfig // 配置文件
+	backendPid  int        // 当前的backend服务的pid
+	frontendPid int        // 当前的frontend服务的pid
+}
 
-	url    *url.URL // 最终轮询的地址
-	server *http.Server
-
-	backendPid  int // backend服务的pid
-	frontendPid int
-	swaggerPid  int
-
-	hander func(res http.ResponseWriter, req *http.Request)
-
-	lock *sync.RWMutex
+// NewProxy 初始化一个Proxy
+func NewProxy(c framework.Container) *Proxy {
+	devConfig := initDevConfig(c)
+	return &Proxy{
+		devConfig: devConfig,
+	}
 }
 
 // 重新启动一个proxy网关
-func newProxyReverseProxy(backend, frontend, swagger *url.URL) *httputil.ReverseProxy {
+func (p *Proxy) newProxyReverseProxy(frontend, backend *url.URL) *httputil.ReverseProxy {
+	if p.frontendPid == 0 && p.backendPid == 0 {
+		fmt.Println("前端和后端服务都不存在")
+		return nil
+	}
+
+	// 后端服务存在
+	if p.frontendPid == 0 && p.backendPid != 0 {
+		return httputil.NewSingleHostReverseProxy(backend)
+	}
+
+	// 前端服务存在
+	if p.backendPid == 0 && p.frontendPid != 0 {
+		return httputil.NewSingleHostReverseProxy(frontend)
+	}
+
+	// 两个都有进程
+	// 先创建一个后端服务的directory
 	director := func(req *http.Request) {
-		req.URL.Scheme = backend.Scheme
-		req.URL.Host = backend.Host
-		if frontend != nil && strings.HasPrefix(req.URL.Path, frontendPrefix) {
+		if req.URL.Path == "/" || req.URL.Path == "/app.js" {
 			req.URL.Scheme = frontend.Scheme
 			req.URL.Host = frontend.Host
-			req.URL.Path = strings.ReplaceAll(req.URL.Path, frontendPrefix, "")
-		}
-		if swagger != nil && strings.HasPrefix(req.URL.Path, swaggerPrefix) {
-			req.URL.Scheme = swagger.Scheme
-			req.URL.Host = swagger.Host
-			// req.URL.Path = strings.ReplaceAll(req.URL.Path, swaggerPrefix, "")
-		}
-		if _, ok := req.Header["User-Agent"]; !ok {
-			req.Header.Set("User-Agent", "")
+		} else {
+			req.URL.Scheme = backend.Scheme
+			req.URL.Host = backend.Host
 		}
 	}
-	return &httputil.ReverseProxy{Director: director}
+
+	// 定义一个NotFoundErr
+	NotFoundErr := errors.New("response is 404, need to redirect")
+	return &httputil.ReverseProxy{
+		Director: director, // 先转发到后端服务
+		ModifyResponse: func(response *http.Response) error {
+			// 如果后端服务返回了404，我们返回NotFoundErr 会进入到errorHandler中
+			if response.StatusCode == 404 {
+				return NotFoundErr
+			}
+			return nil
+		},
+		ErrorHandler: func(writer http.ResponseWriter, request *http.Request, err error) {
+			// 判断 Error 是否为NotFoundError, 是的话则进行前端服务的转发，重新修改writer
+			if errors.Is(err, NotFoundErr) {
+				httputil.NewSingleHostReverseProxy(frontend).ServeHTTP(writer, request)
+			}
+		}}
 }
 
+// rebuildBackend 重新编译后端
 func (p *Proxy) rebuildBackend() error {
 	// 重新编译hade
-	cmdBuild := exec.Command("./hade", "build", "self")
+	bin := os.Args[0]
+	cmdBuild := exec.Command(bin, "build", "backend")
 	cmdBuild.Stdout = os.Stdout
 	cmdBuild.Stderr = os.Stderr
 	if err := cmdBuild.Start(); err == nil {
@@ -89,338 +159,227 @@ func (p *Proxy) rebuildBackend() error {
 	return nil
 }
 
-func (p *Proxy) rebuildSwagger() error {
-	// 重新编译hade
-	cmdBuild := exec.Command("./hade", "swagger", "gen")
-	cmdBuild.Stdout = os.Stdout
-	cmdBuild.Stderr = os.Stderr
-	if err := cmdBuild.Start(); err == nil {
-		err = cmdBuild.Wait()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
+// restartBackend 启动后端服务
+func (p *Proxy) restartBackend() error {
 
-// 启动swagger服务
-func (p *Proxy) startSwagger() (swaggerUrl *url.URL, pid int, err error) {
-	swaggerAddress := fmt.Sprintf("http://%s:%d", "127.0.0.1", 8080)
-	swaggerUrl, err = url.Parse(swaggerAddress)
-	cmd := exec.Command("./hade", "swagger", "serve", "--address="+swaggerAddress)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Start()
-	if err != nil {
-		return
+	// 杀死之前的进程
+	if p.backendPid != 0 {
+		syscall.Kill(p.backendPid, syscall.SIGKILL)
+		p.backendPid = 0
 	}
-	pid = cmd.Process.Pid
-	fmt.Println("swagger server:", swaggerAddress)
-	return
-}
 
-// 启动后端服务
-func (p *Proxy) startBackend() (backendUrl *url.URL, pid int, err error) {
 	// 设置随机端口，真实后端的端口
-	rand.Seed(time.Now().UnixNano())
-	port := rand.Int63n(10000) + 10000
-	hadeAddress := fmt.Sprintf("http://%s:%d", "127.0.0.1", port)
-	backendUrl, err = url.Parse(hadeAddress)
-	if err != nil {
-		return
-	}
+	port := p.devConfig.Backend.Port
+	hadeAddress := fmt.Sprintf(":" + port)
+
+	bin := os.Args[0]
 	// 使用命令行启动后端进程
-	cmd := exec.Command("./hade", "app", "start", "--address="+hadeAddress)
+	cmd := exec.Command(bin, "app", "start", "--address="+hadeAddress)
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err = cmd.Start()
+	fmt.Println("启动后端服务: ", "http://127.0.0.1:"+port)
+	err := cmd.Start()
 	if err != nil {
-		return
+		fmt.Println(err)
 	}
-	pid = cmd.Process.Pid
-	fmt.Println("backend server:", hadeAddress)
-
-	return
+	p.backendPid = cmd.Process.Pid
+	fmt.Println("后端服务pid:", p.backendPid)
+	return nil
 }
 
 // 启动前端服务
-func (p *Proxy) startFrontend() (frontendUrl *url.URL, pid int, err error) {
+func (p *Proxy) restartFrontend() error {
 	// 启动前端调试模式
-	rand.Seed(time.Now().UnixNano())
-	port := rand.Int63n(10000) + 10000
+	// 先杀死旧进程
+	if p.frontendPid != 0 {
+		syscall.Kill(p.frontendPid, syscall.SIGKILL)
+		p.frontendPid = 0
+	}
+
+	// 否则开启npm run serve
+	port := p.devConfig.Frontend.Port
 	path, err := exec.LookPath("npm")
 	if err != nil {
-		return
+		return err
 	}
-	cmd := exec.Command(path, "run", "serve")
+	cmd := exec.Command(path, "run", "dev")
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("%s%d", "PORT=", port))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("%s%s", "PORT=", port))
 	cmd.Stdout = os.NewFile(0, os.DevNull)
 	cmd.Stderr = os.Stderr
-	pid = cmd.Process.Pid
-	go func() {
-		err := cmd.Run()
-		fmt.Println("frontend server: ", "http://127.0.0.1:", port)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
 
-	frontendUrl, err = url.Parse(fmt.Sprintf("%s%d", "http://127.0.0.1:", port))
+	// 因为npm run serve 是控制台挂起模式，所以这里使用go routine启动
+	err = cmd.Start()
+	fmt.Println("启动前端服务: ", "http://127.0.0.1:"+port)
 	if err != nil {
-		return
+		fmt.Println(err)
 	}
-	return
+	p.frontendPid = cmd.Process.Pid
+	fmt.Println("前端服务pid:", p.frontendPid)
+
+	return nil
 }
 
-// 重启后端服务, 如果frontend为nil，则没有包含后端
-func (p *Proxy) startProxy(startBackend, startFrontend, startSwagger bool) error {
+// 启动proxy服务，并且根据参数启动前端服务或者后端服务
+func (p *Proxy) startProxy(startFrontend, startBackend bool) error {
+	var backendURL, frontendURL *url.URL
 	var err error
-	p.lock.Lock()
-	defer p.lock.Unlock()
-	var backendURL, frontendURL, swaggerURL *url.URL
-	var backendPid, frontendPid, swaggerPid int
 
+	// 启动后端
 	if startBackend {
-		if backendURL, backendPid, err = p.startBackend(); err != nil {
+		if err := p.restartBackend(); err != nil {
 			return err
 		}
 	}
+	// 启动前端
 	if startFrontend {
-		if frontendURL, frontendPid, err = p.startFrontend(); err != nil {
-			return nil
-		}
-	}
-	if startSwagger {
-		p.rebuildSwagger()
-		if swaggerURL, swaggerPid, err = p.startSwagger(); err != nil {
-			return nil
+		if err := p.restartFrontend(); err != nil {
+			return err
 		}
 	}
 
-	if p.proxyServer != nil {
-		p.proxyServer.Close()
+	if frontendURL, err = url.Parse(fmt.Sprintf("%s%s", "http://127.0.0.1:", p.devConfig.Frontend.Port)); err != nil {
+		return err
 	}
 
-	p.proxyReverse = newProxyReverseProxy(backendURL, frontendURL, swaggerURL)
-	p.proxyServer = &http.Server{
-		Addr:    "127.0.0.1:" + p.proxyURL.Port(),
-		Handler: p.proxyReverse,
-	}
-	go func() {
-		err := p.proxyServer.ListenAndServe()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
-	fmt.Println("proxy backend server:", p.proxyURL.String())
-
-	if p.backendPid != 0 {
-		syscall.Kill(p.backendPid, syscall.SIGKILL)
-		p.backendPid = backendPid
-	}
-	if p.frontendPid != 0 {
-		syscall.Kill(p.frontendPid, syscall.SIGKILL)
-		p.frontendPid = frontendPid
-	}
-	if p.swaggerPid != 0 {
-		syscall.Kill(p.swaggerPid, syscall.SIGKILL)
-		p.swaggerPid = swaggerPid
+	if backendURL, err = url.Parse(fmt.Sprintf("%s%s", "http://127.0.0.1:", p.devConfig.Backend.Port)); err != nil {
+		return err
 	}
 
+	// 设置反向代理
+	proxyReverse := p.newProxyReverseProxy(frontendURL, backendURL)
+	proxyServer := &http.Server{
+		Addr:    "127.0.0.1:" + p.devConfig.Port,
+		Handler: proxyReverse,
+	}
+
+	fmt.Println("代理服务启动:", "http://"+proxyServer.Addr)
+	// 启动proxy服务
+	err = proxyServer.ListenAndServe()
+	if err != nil {
+		fmt.Println(err)
+	}
 	return nil
+}
+
+// monitorBackend 监听应用文件
+func (p *Proxy) monitorBackend() error {
+	// 监听
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	defer watcher.Close()
+
+	// 开启监听目标文件夹
+	appFolder := p.devConfig.Backend.MonitorFolder
+	fmt.Println("监控文件夹：", appFolder)
+	// 监听所有子目录，需要使用filepath.walk
+	filepath.Walk(appFolder, func(path string, info os.FileInfo, err error) error {
+		if info != nil && !info.IsDir() {
+			return nil
+		}
+		// 如果是隐藏的目录比如 . 或者 .. 则不用进行监控
+		if util.IsHiddenDirectory(path) {
+			return nil
+		}
+		return watcher.Add(path)
+	})
+
+	// 开启计时时间机制
+	refreshTime := p.devConfig.Backend.RefreshTime
+	t := time.NewTimer(time.Duration(refreshTime) * time.Second)
+	// 先停止计时器
+	t.Stop()
+	for {
+		select {
+		case <-t.C:
+			// 计时器时间到了，代表之前有文件更新事件重置过计时器
+			// 即有文件更新
+			fmt.Println("...检测到文件更新，重启服务开始...")
+            fmt.Println("...期间请不要发送任何请求...")
+			if err := p.rebuildBackend(); err != nil {
+				fmt.Println("重新编译失败：", err.Error())
+			} else {
+				if err := p.restartBackend(); err != nil {
+					fmt.Println("重新启动失败：", err.Error())
+				}
+			}
+			fmt.Println("...检测到文件更新，重启服务结束...")
+			// 停止计时器
+			t.Stop()
+		case _, ok := <-watcher.Events:
+			if !ok {
+				continue
+			}
+			// 有文件更新事件，重置计时器
+			t.Reset(time.Duration(refreshTime) * time.Second)
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				continue
+			}
+			// 如果有文件监听错误，则停止计时器
+			fmt.Println("监听文件夹错误：", err.Error())
+			t.Reset(time.Duration(refreshTime) * time.Second)
+		}
+	}
 }
 
 // 初始化Dev命令
 func initDevCommand() *cobra.Command {
-	devCommand.PersistentFlags().BoolVarP(&openSwagger, "swagger", "s", false, "是否打开swagger")
-	devCommand.PersistentFlags().Int32VarP(&refreshTime, "refresh", "r", 3, "更新时间")
-	devCommand.PersistentFlags().StringVarP(&proxyURL, "address", "a", "http://127.0.0.1:8066", "")
-
 	devCommand.AddCommand(devBackendCommand)
 	devCommand.AddCommand(devFrontendCommand)
 	devCommand.AddCommand(devAllCommand)
 	return devCommand
 }
 
+// devCommand 为调试模式的一级命令
 var devCommand = &cobra.Command{
 	Use:   "dev",
-	Short: "dev mode",
+	Short: "调试模式",
 	RunE: func(c *cobra.Command, args []string) error {
 		c.Help()
 		return nil
 	},
 }
 
-// serveCommand start a app serve
+// devBackendCommand 启动后端调试模式
 var devBackendCommand = &cobra.Command{
 	Use:   "backend",
-	Short: "dev mode for backend, hot reload",
+	Short: "启动后端调试模式",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
-
-		proxyURL, err := url.Parse(proxyURL)
-		if err != nil {
+		proxy := NewProxy(c.GetContainer())
+		go proxy.monitorBackend()
+		if err := proxy.startProxy(false, true); err != nil {
 			return err
 		}
-		proxy := &Proxy{proxyURL: proxyURL, lock: &sync.RWMutex{}}
-
-		if err = proxy.rebuildBackend(); err != nil {
-			return err
-		}
-
-		if err = proxy.startProxy(true, false, openSwagger); err != nil {
-			return err
-		}
-
-		// 监听
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			return err
-		}
-		defer watcher.Close()
-
-		appFolder := appService.AppPath()
-		swaggerFolder := appService.SwaggerPath()
-		filepath.Walk(appFolder, func(path string, info os.FileInfo, err error) error {
-			if info != nil && !info.IsDir() {
-				return nil
-			}
-			if util.IsHiddenDirectory(path) {
-				return nil
-			}
-			if !info.IsDir() && (filepath.Dir(path) == filepath.Dir(swaggerFolder)) {
-				return nil
-			}
-			if info.IsDir() && (path == filepath.Dir(swaggerFolder)) {
-				return nil
-			}
-
-			return watcher.Add(path)
-		})
-
-		t := time.NewTimer(time.Duration(refreshTime) * time.Second)
-		t.Stop()
-		for {
-			select {
-			case <-t.C:
-				fmt.Println("...detect some file change, hot reload start...")
-				proxy.rebuildBackend()
-				if openSwagger {
-					proxy.rebuildSwagger()
-				}
-				proxy.startProxy(true, false, openSwagger)
-				fmt.Println("...detect some file change, hot reload finish...")
-				t.Stop()
-			case ev, ok := <-watcher.Events:
-				if !ok {
-					continue
-				}
-				fmt.Println(ev)
-				t.Reset(time.Duration(refreshTime) * time.Second)
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					continue
-				}
-				log.Panicln(err)
-				t.Reset(time.Duration(refreshTime) * time.Second)
-			}
-		}
+		return nil
 	},
 }
 
+// devFrontendCommand 启动前端调试模式
 var devFrontendCommand = &cobra.Command{
 	Use:   "frontend",
-	Short: "dev mode for frontend",
+	Short: "前端调试模式",
 	RunE: func(c *cobra.Command, args []string) error {
-		path, err := exec.LookPath("npm")
-		if err != nil {
-			log.Fatalln("hade npm: should install npm in your PATH")
-			return err
-		}
 
-		cmd := exec.Command(path, "run", "serve")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Run()
-		return nil
+		// 启动前端服务
+		proxy := NewProxy(c.GetContainer())
+		return proxy.startProxy(true, false)
+
 	},
 }
 
 var devAllCommand = &cobra.Command{
 	Use:   "all",
-	Short: "dev mode from both frontend and backend",
+	Short: "同时启动前端和后端调试",
 	RunE: func(c *cobra.Command, args []string) error {
-		container := commandUtil.GetContainer(c.Root())
-		appService := container.MustMake(contract.AppKey).(contract.App)
-
-		proxyURL, err := url.Parse(proxyURL)
-		if err != nil {
+		proxy := NewProxy(c.GetContainer())
+		go proxy.monitorBackend()
+		if err := proxy.startProxy(true, true); err != nil {
 			return err
 		}
-		proxy := &Proxy{proxyURL: proxyURL, lock: &sync.RWMutex{}}
-
-		if err = proxy.rebuildBackend(); err != nil {
-			return err
-		}
-
-		if err = proxy.startProxy(true, false, openSwagger); err != nil {
-			return err
-		}
-
-		// 监听
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			return err
-		}
-		defer watcher.Close()
-
-		appFolder := appService.AppPath()
-		swaggerFolder := appService.SwaggerPath()
-		filepath.Walk(appFolder, func(path string, info os.FileInfo, err error) error {
-			if info != nil && !info.IsDir() {
-				return nil
-			}
-			if util.IsHiddenDirectory(path) {
-				return nil
-			}
-			if !info.IsDir() && (filepath.Dir(path) == filepath.Dir(swaggerFolder)) {
-				return nil
-			}
-			if info.IsDir() && (path == filepath.Dir(swaggerFolder)) {
-				return nil
-			}
-
-			return watcher.Add(path)
-		})
-
-		t := time.NewTimer(time.Duration(refreshTime) * time.Second)
-		t.Stop()
-		for {
-			select {
-			case <-t.C:
-				fmt.Println("...detect some file change, hot reload start...")
-				proxy.rebuildBackend()
-				if openSwagger {
-					proxy.rebuildSwagger()
-				}
-				proxy.startProxy(true, true, openSwagger)
-				fmt.Println("...detect some file change, hot reload finish...")
-				t.Stop()
-			case ev, ok := <-watcher.Events:
-				if !ok {
-					continue
-				}
-				fmt.Println(ev)
-				t.Reset(time.Duration(refreshTime) * time.Second)
-			case err, ok := <-watcher.Errors:
-				if !ok {
-					continue
-				}
-				log.Panicln(err)
-				t.Reset(time.Duration(refreshTime) * time.Second)
-			}
-		}
+		return nil
 	},
 }

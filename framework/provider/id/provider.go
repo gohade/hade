@@ -24,7 +24,7 @@ func (provider *HadeIDProvider) IsDefer() bool {
 }
 
 // Params define the necessary params for NewInstance
-func (provider *HadeIDProvider) Params() []interface{} {
+func (provider *HadeIDProvider) Params(c framework.Container) []interface{} {
 	return []interface{}{}
 }
 

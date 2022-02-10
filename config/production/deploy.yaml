@@ -1,0 +1,11 @@
+host: 127.0.0.1
+user: yejianfeng
+password: 123abc 
+rsa_key: 
+timeout: 1000
+remote_path: "/home/yejianfeng/"
+post_shell: 
+  - "./hade serve restart"
+  - "pwd"
+goos: linux
+goarch: amd64

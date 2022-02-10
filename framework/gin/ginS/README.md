@@ -6,7 +6,7 @@ This is API experiment for Gin.
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"github.com/gohade/hade/framework/gin"
 	"github.com/gohade/hade/framework/gin/ginS"
 )
 
