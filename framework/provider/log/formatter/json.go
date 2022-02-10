@@ -12,6 +12,9 @@ import (
 
 func JsonFormatter(level contract.LogLevel, t time.Time, msg string, fields map[string]interface{}) ([]byte, error) {
 	bf := bytes.NewBuffer([]byte{})
+	if fields == nil {
+		fields = map[string]interface{}{}
+	}
 	fields["msg"] = msg
 	fields["level"] = level
 	fields["timestamp"] = t.Format(time.RFC3339)

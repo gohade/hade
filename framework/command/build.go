@@ -37,7 +37,7 @@ var buildSelfCommand = &cobra.Command{
 			log.Fatalln("hade go: 请在Path路径中先安装go")
 		}
 
-		cmd := exec.Command(path, "build", "-o", "hade", "./")
+		cmd := exec.Command(path, "build", "./")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			fmt.Println("go build error:")
