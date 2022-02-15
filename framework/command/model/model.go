@@ -48,6 +48,7 @@ var modelGenCommand = &cobra.Command{
 	Short: "生成模型",
 	RunE: func(c *cobra.Command, args []string) error {
 
+		// 确认output路径是绝对路径
 		if !filepath.IsAbs(output) {
 			absOutput, err := filepath.Abs(output)
 			if err != nil {

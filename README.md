@@ -56,6 +56,8 @@ http://hade.funaio.cn/
 
 [待做事项](docs/guide/todo.md)
 
+[数据模型](docs/guide/model.md)
+
 # author
 
 有任何问题可直接github留言，或者联系作者：轩脉刃
@@ -64,6 +66,4 @@ http://hade.funaio.cn/
 
 # 更多
 
-本框架在极客时间开设专栏，欢迎对框架刚兴趣的同学关注专栏：《手把手带你写一个 Web 框架》
-
-![web_jike](http://tuchuang.funaio.cn/web_jike.jpeg)
+本框架在极客时间开设专栏，欢迎对框架的生成感兴趣的同学关注专栏：《手把手带你写一个 Web 框架》
