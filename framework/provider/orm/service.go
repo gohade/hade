@@ -128,7 +128,7 @@ func (app *HadeGorm) GetDB(option ...contract.DBOption) (*gorm.DB, error) {
     }
 
     // 挂载到map中，结束配置
-    if err != nil {
+    if err == nil {
         app.dbs[config.Dsn] = db
     }
 

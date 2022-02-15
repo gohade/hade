@@ -1,9 +1,9 @@
 package cobra
 
 import (
-	"github.com/gohade/hade/framework"
-	"github.com/robfig/cron/v3"
 	"log"
+
+	"github.com/gohade/hade/framework"
 )
 
 // SetContainer 设置服务容器
@@ -32,11 +32,6 @@ func (c *Command) SetParantNull() {
 func (c *Command) AddCronCommand(spec string, cmd *Command) {
 	// cron结构是挂载在根Command上的
 	root := c.Root()
-	if root.Cron == nil {
-		// 初始化cron
-		root.Cron = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
-		root.CronSpecs = []CronSpec{}
-	}
 	// 增加说明信息
 	root.CronSpecs = append(root.CronSpecs, CronSpec{
 		Type: "normal-cron",
@@ -44,16 +39,17 @@ func (c *Command) AddCronCommand(spec string, cmd *Command) {
 		Spec: spec,
 	})
 
-	// 制作一个rootCommand
-	var cronCmd Command
-	ctx := root.Context()
-	cronCmd = *cmd
-	cronCmd.args = []string{}
-	cronCmd.SetParantNull()
-	cronCmd.SetContainer(root.GetContainer())
-
 	// 增加调用函数
 	root.Cron.AddFunc(spec, func() {
+
+		// 制作一个rootCommand，必须放在这个里面做复制，否则会产生竞态
+		var cronCmd Command
+		ctx := root.Context()
+		cronCmd = *cmd
+		cronCmd.args = []string{}
+		cronCmd.SetParantNull()
+		cronCmd.SetContainer(root.GetContainer())
+
 		// 如果后续的command出现panic，这里要捕获
 		defer func() {
 			if err := recover(); err != nil {
