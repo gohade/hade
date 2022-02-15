@@ -43,6 +43,7 @@ module.exports = {
                         "middleware",
                         "swagger",
                         "provider",
+                        "model",
                         "todo",
                     ],
                 },
