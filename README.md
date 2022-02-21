@@ -58,6 +58,8 @@ http://hade.funaio.cn/
 
 [数据模型](docs/guide/model.md)
 
+[辅助函数](docs/guide/util.md)
+
 # author
 
 有任何问题可直接github留言，或者联系作者：轩脉刃
