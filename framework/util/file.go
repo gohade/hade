@@ -21,12 +21,12 @@ func Exists(path string) bool {
 	return true
 }
 
-// 路径是否是隐藏路径
+// IsHiddenDirectory 路径是否是隐藏路径
 func IsHiddenDirectory(path string) bool {
 	return len(path) > 1 && strings.HasPrefix(filepath.Base(path), ".")
 }
 
-// 输出所有子目录，目录名
+// SubDir 输出所有子目录，目录名
 func SubDir(folder string) ([]string, error) {
 	subs, err := ioutil.ReadDir(folder)
 	if err != nil {
