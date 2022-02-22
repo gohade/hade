@@ -2,9 +2,11 @@ package util
 
 import (
 	"errors"
+	"github.com/gohade/hade/framework/gin"
 	"github.com/gohade/hade/framework/provider/log"
-	"github.com/gohade/hade/framework/util"
+	"github.com/gohade/hade/framework/util/goroutine"
 	tests "github.com/gohade/hade/test"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -13,16 +15,16 @@ func TestSafeGo(t *testing.T) {
 	container := tests.InitBaseContainer()
 	container.Bind(&log.HadeTestingLogProvider{})
 
-	errStr := "safe go test error"
-	util.SafeGo(container, func() error {
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	goroutine.SafeGo(ctx, func() {
 		time.Sleep(1 * time.Second)
-		return errors.New(errStr)
+		return
 	})
 	t.Log("safe go main start")
 	time.Sleep(2 * time.Second)
 	t.Log("safe go main end")
 
-	util.SafeGo(container, func() error {
+	goroutine.SafeGo(ctx, func() {
 		time.Sleep(1 * time.Second)
 		panic("safe go test panic")
 	})
@@ -38,8 +40,9 @@ func TestSafeGoAndWait(t *testing.T) {
 
 	errStr := "safe go test error"
 	t.Log("safe go and wait start", time.Now().String())
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 
-	err := util.SafeGoAndWait(container, func() error {
+	err := goroutine.SafeGoAndWait(ctx, func() error {
 		time.Sleep(1 * time.Second)
 		return errors.New(errStr)
 	}, func() error {
@@ -58,7 +61,7 @@ func TestSafeGoAndWait(t *testing.T) {
 	}
 
 	// panic error
-	err = util.SafeGoAndWait(container, func() error {
+	err = goroutine.SafeGoAndWait(ctx, func() error {
 		time.Sleep(1 * time.Second)
 		return errors.New(errStr)
 	}, func() error {
