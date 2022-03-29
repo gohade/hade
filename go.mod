@@ -21,6 +21,7 @@ require (
 	github.com/jianfengye/collection v1.4.1
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/json-iterator/go v1.1.12
+	github.com/juju/ratelimit v1.0.1
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/kr/pretty v0.3.0
 	github.com/leodido/go-urn v1.2.1 // indirect
