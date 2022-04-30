@@ -1,0 +1,7 @@
+user:
+    -   name: id
+        type: int
+    -   name: username
+        type: string
+    -   name: create_at
+        type: timestamp

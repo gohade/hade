@@ -6,7 +6,6 @@ loc: Local # 通用配置，时区
 
 default:
     driver: mysql # 连接驱动
-    dsn: "" # dsn，如果设置了dsn, 以下的所有设置都不生效
     host: localhost # ip地址
     port: 3306 # 端口
     database: bbs # 数据库

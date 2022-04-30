@@ -11,7 +11,9 @@ git 地址： https://github.com/gohade/hade
 - 引入rpc机制
 - service provider 自动生成 http 和 rpc 的命令
 - 自动生成api接口
+- command list 命令展示所有层级
 
 已办事项：
 
 - 增加自动生成model机制 (2022-02-14)
+- 增加goroutine相关的函数 (2022-02-22)

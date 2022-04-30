@@ -1,0 +1,25 @@
+-   name: user_list
+    path: "/user/list"
+    method: "get"
+    params:
+        -   name: name
+            type: string
+            validate: required
+    workflow:
+        -   name: get_users_by_name
+            type: sql/func
+            database: database.default
+            func: App/Auto/Step2
+            input:
+                username: params.name
+            sql: "select * from users where username = @username"
+            output:
+                name: users_by_name
+                type: array/struct/string/int
+                adapter: App/Auto/TimeStampAuto
+                validate: required
+                fields:
+                    -   name: id
+                        type: int
+                        validate: required
+                        adapter: App/Auto/TimeStampAuto
