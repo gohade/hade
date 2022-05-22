@@ -1,0 +1,17 @@
+default:
+    type: sync
+
+channel:
+    type: channel
+
+redis:
+    type: redis
+    connection: redis.write
+
+mysql:
+    type: mysql
+    connection: database.default
+
+kafka:
+    type: kafka
+    connection: kakfa.default

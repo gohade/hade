@@ -1,7 +1,9 @@
 package http
 
 import (
+	"github.com/gohade/hade/app/http/job"
 	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/gin"
 )
 
@@ -11,6 +13,10 @@ func NewHttpEngine(container framework.Container) (*gin.Engine, error) {
 	gin.SetMode(gin.ReleaseMode)
 	// 默认启动一个Web引擎
 	r := gin.New()
+
+	// 注册各种job
+	RegisterJobs(container)
+
 	// 设置了Engine
 	r.SetContainer(container)
 
@@ -21,4 +27,10 @@ func NewHttpEngine(container framework.Container) (*gin.Engine, error) {
 	Routes(r)
 	// 返回绑定路由后的Web引擎
 	return r, nil
+}
+
+// RegisterJobs 注册各种Job
+func RegisterJobs(container framework.Container) {
+	queue := container.MustMake(contract.QueueKey).(contract.QueueService)
+	queue.Register(&job.CreateUser{})
 }
