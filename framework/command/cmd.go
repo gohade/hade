@@ -42,9 +42,24 @@ var cmdListCommand = &cobra.Command{
 	RunE: func(c *cobra.Command, args []string) error {
 		cmds := c.Root().Commands()
 		ps := [][]string{}
+		var treeList func(cmds []*cobra.Command, level int)
+		treeList = func(cmds []*cobra.Command, level int) {
+			if len(cmds) == 0 {
+				return
+			}
+			padding := strings.Repeat("    ", level-1) + " |---"
+			for _, line := range cmds {
+				ps = append(ps, []string{padding + line.Name(), line.Short})
+				if len(line.Commands()) > 0 {
+					level++
+					treeList(line.Commands(), level)
+				}
+			}
+		}
 		for _, cmd := range cmds {
 			line := []string{cmd.Name(), cmd.Short}
 			ps = append(ps, line)
+			treeList(cmd.Commands(), 1)
 		}
 		util.PrettyPrint(ps)
 		return nil
