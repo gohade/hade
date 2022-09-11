@@ -6,6 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
 	github.com/denisenkom/go-mssqldb v0.12.0 // indirect
+	github.com/disiqueira/gotree v1.0.0
 	github.com/erikdubbelboer/gspt v0.0.0-20210805194459-ce36a5128377
 	github.com/fsnotify/fsnotify v1.5.1
 	github.com/gin-contrib/sse v0.1.0
