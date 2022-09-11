@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/gohade/hade/framework/cobra"
@@ -164,7 +163,7 @@ func (p *Proxy) restartBackend() error {
 
 	// 杀死之前的进程
 	if p.backendPid != 0 {
-		syscall.Kill(p.backendPid, syscall.SIGKILL)
+		util.KillProcess(p.backendPid)
 		p.backendPid = 0
 	}
 
@@ -193,7 +192,7 @@ func (p *Proxy) restartFrontend() error {
 	// 启动前端调试模式
 	// 先杀死旧进程
 	if p.frontendPid != 0 {
-		syscall.Kill(p.frontendPid, syscall.SIGKILL)
+		util.KillProcess(p.frontendPid)
 		p.frontendPid = 0
 	}
 
@@ -298,7 +297,7 @@ func (p *Proxy) monitorBackend() error {
 			// 计时器时间到了，代表之前有文件更新事件重置过计时器
 			// 即有文件更新
 			fmt.Println("...检测到文件更新，重启服务开始...")
-            fmt.Println("...期间请不要发送任何请求...")
+			fmt.Println("...期间请不要发送任何请求...")
 			if err := p.rebuildBackend(); err != nil {
 				fmt.Println("重新编译失败：", err.Error())
 			} else {

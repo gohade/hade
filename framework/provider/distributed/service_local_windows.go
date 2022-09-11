@@ -1,6 +1,3 @@
-//go:build !windows
-// +build !windows
-
 package distributed
 
 import (
@@ -41,11 +38,24 @@ func (s LocalDistributedService) Select(serviceName string, appID string, holdTi
 	if err != nil {
 		return "", err
 	}
-
-	// 尝试独占文件锁
-	err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-	// 抢不到文件锁
+	h, err := syscall.LoadLibrary("kernel32.dll")
 	if err != nil {
+		return "", err
+	}
+	defer syscall.FreeLibrary(h)
+
+	addr, err := syscall.GetProcAddress(h, "LockFile")
+	if err != nil {
+		return "", err
+	}
+	unlockAddr, err := syscall.GetProcAddress(h, "UnlockFile")
+	if err != nil {
+		return "", err
+	}
+	// 尝试抢占文件锁
+	r0, _, _ := syscall.Syscall6(addr, 5, lock.Fd(), 0, 0, 0, 1, 0)
+	if 0 == int(r0) {
+		// 抢不到
 		// 读取被选择的appid
 		selectAppIDByt, err := ioutil.ReadAll(lock)
 		if err != nil {
@@ -53,12 +63,12 @@ func (s LocalDistributedService) Select(serviceName string, appID string, holdTi
 		}
 		return string(selectAppIDByt), err
 	}
+	// 抢到了
 
 	// 在一段时间内，选举有效，其他节点在这段时间不能再进行抢占
 	go func() {
 		defer func() {
-			// 释放文件锁
-			syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
+			syscall.Syscall6(unlockAddr, 5, lock.Fd(), 0, 0, 0, 1, 0)
 			// 释放文件
 			lock.Close()
 			// 删除文件锁对应的文件
