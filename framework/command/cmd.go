@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/disiqueira/gotree"
 	"html/template"
 	"os"
 	"path/filepath"
@@ -40,15 +41,18 @@ var cmdListCommand = &cobra.Command{
 	Use:   "list",
 	Short: "列出所有控制台命令",
 	RunE: func(c *cobra.Command, args []string) error {
-		cmds := c.Root().Commands()
-		ps := [][]string{}
-		for _, cmd := range cmds {
-			line := []string{cmd.Name(), cmd.Short}
-			ps = append(ps, line)
-		}
-		util.PrettyPrint(ps)
+		rootTree := gotree.New("hade")
+		addCommandToTree(rootTree, c.Root())
+		fmt.Println(rootTree.Print())
 		return nil
 	},
+}
+
+func addCommandToTree(tree gotree.Tree, cmd *cobra.Command) {
+	for _, c := range cmd.Commands() {
+		node := tree.Add(c.Name() + "\t" + c.Short)
+		addCommandToTree(node, c)
+	}
 }
 
 // cmdCreateCommand 创建一个业务控制台命令
