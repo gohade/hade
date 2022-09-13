@@ -1,10 +1,13 @@
 package demo
 
 import (
+	"time"
+
+	"github.com/gohade/hade/framework/xerror"
+
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/gin"
 	"github.com/gohade/hade/framework/provider/redis"
-	"time"
 )
 
 // DemoRedis redis的路由方法
@@ -36,7 +39,7 @@ func (api *DemoApi) DemoRedis(c *gin.Context) {
 		return
 	}
 
-	c.JSON(200, "ok")
+	c.JSON(200, xerror.GetErr(xerror.OK))
 }
 
 // DemoCache cache的简单例子
@@ -65,5 +68,5 @@ func (api *DemoApi) DemoCache(c *gin.Context) {
 		c.AbortWithError(500, err)
 		return
 	}
-	c.JSON(200, "ok")
+	c.JSON(200, xerror.GetErr(xerror.OK))
 }

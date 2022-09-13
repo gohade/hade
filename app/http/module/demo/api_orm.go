@@ -2,10 +2,13 @@ package demo
 
 import (
 	"database/sql"
+	"time"
+
+	"github.com/gohade/hade/framework/xerror"
+
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/gin"
 	"github.com/gohade/hade/framework/provider/orm"
-	"time"
 )
 
 // DemoOrm Orm的路由方法
@@ -75,5 +78,5 @@ func (api *DemoApi) DemoOrm(c *gin.Context) {
 		"err": err,
 		"id":  user.ID,
 	})
-	c.JSON(200, "ok")
+	c.JSON(200, xerror.GetErr(xerror.OK))
 }

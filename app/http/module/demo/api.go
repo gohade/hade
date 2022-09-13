@@ -3,6 +3,7 @@ package demo
 import (
 	demoService "github.com/gohade/hade/app/provider/demo"
 	"github.com/gohade/hade/framework/gin"
+	"github.com/gohade/hade/framework/xerror"
 )
 
 type DemoApi struct {
@@ -34,7 +35,7 @@ func NewDemoApi() *DemoApi {
 // @Success 200 array []UserDTO
 // @Router /demo/demo [get]
 func (api *DemoApi) Demo(c *gin.Context) {
-	c.JSON(200, "this is demo for dev all")
+	c.JSON(200, xerror.GetErr(xerror.OK).WithData("this is demo for dev all"))
 }
 
 // Demo2  for godoc
@@ -48,7 +49,7 @@ func (api *DemoApi) Demo2(c *gin.Context) {
 	demoProvider := c.MustMake(demoService.DemoKey).(demoService.IService)
 	students := demoProvider.GetAllStudent()
 	usersDTO := StudentsToUserDTOs(students)
-	c.JSON(200, usersDTO)
+	c.JSON(200, xerror.GetErr(xerror.OK).WithData(usersDTO))
 }
 
 func (api *DemoApi) DemoPost(c *gin.Context) {
@@ -60,5 +61,5 @@ func (api *DemoApi) DemoPost(c *gin.Context) {
 	if err != nil {
 		c.AbortWithError(500, err)
 	}
-	c.JSON(200, nil)
+	c.JSON(200, xerror.GetErr(xerror.OK))
 }
