@@ -8,6 +8,8 @@ import (
 	"github.com/google/go-github/v39/github"
 	"github.com/spf13/cast"
 	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,7 +44,8 @@ var newCommand = &cobra.Command{
 			}
 			err := survey.AskOne(prompt, &name)
 			if err != nil {
-				return err
+				fmt.Println("任务终止：" + err.Error())
+				return nil
 			}
 
 			folder = filepath.Join(currentPath, name)
@@ -54,12 +57,14 @@ var newCommand = &cobra.Command{
 				}
 				err := survey.AskOne(prompt2, &isForce)
 				if err != nil {
-					return err
+					fmt.Println("任务终止：" + err.Error())
+					return nil
 				}
 
 				if isForce {
 					if err := os.RemoveAll(folder); err != nil {
-						return err
+						fmt.Println("任务终止：" + err.Error())
+						return nil
 					}
 				} else {
 					fmt.Println("目录已存在，创建应用失败")
@@ -73,19 +78,89 @@ var newCommand = &cobra.Command{
 			}
 			err := survey.AskOne(prompt, &mod)
 			if err != nil {
-				return err
+				fmt.Println("任务终止：" + err.Error())
+				return nil
 			}
 			if mod == "" {
 				mod = name
 			}
 		}
 		{
-			// 获取hade的版本
-			client := github.NewClient(nil)
-			prompt := &survey.Input{
-				Message: "请输入版本名称(参考 https://github.com/gohade/hade/releases，默认为最新版本)：",
+			// 检测到github的连接
+			fmt.Println("hade源码从github.com中下载，正在检测到github.com的连接")
+			var client *github.Client
+			client = github.NewClient(nil)
+			perPage := 10
+			opts := &github.ListOptions{Page: 1, PerPage: perPage}
+			releases, rsp, err := client.Repositories.ListReleases(context.Background(), "gohade", "hade", opts)
+			fmt.Println(rsp.Rate.String())
+			if err != nil {
+				if _, ok := err.(*github.RateLimitError); ok {
+					fmt.Println("错误提示：" + err.Error())
+					fmt.Println("说明你的出口ip遇到github的调用限制，可以使用github.com帐号登录方式来增加调用次数")
+					githubUserName := ""
+					prompt := &survey.Input{
+						Message: "请输入github帐号用户名：",
+					}
+					if err := survey.AskOne(prompt, &githubUserName); err != nil {
+						fmt.Println("任务终止：" + err.Error())
+						return nil
+					}
+					githubPassword := ""
+					promptPwd := &survey.Password{
+						Message: "请输入github帐号密码：",
+					}
+					if err := survey.AskOne(promptPwd, &githubPassword); err != nil {
+						fmt.Println("任务终止：" + err.Error())
+						return nil
+					}
+
+					httpClient := &http.Client{
+						Transport: &http.Transport{
+							Proxy: func(req *http.Request) (*url.URL, error) {
+								req.SetBasicAuth(githubUserName, githubPassword)
+								return nil, nil
+							},
+						},
+					}
+					client = github.NewClient(httpClient)
+					releases, rsp, err = client.Repositories.ListReleases(context.Background(), "gohade", "hade", opts)
+					if err != nil {
+						fmt.Println("错误提示：" + err.Error())
+						fmt.Println("用户名密码错误，请重新开始")
+						return nil
+					}
+					if len(releases) == 0 {
+						fmt.Println("用户名密码错误，请重新开始")
+						return nil
+					}
+					fmt.Println(rsp.Rate.String())
+				} else {
+					fmt.Println("github.com的连接异常：" + err.Error())
+					return nil
+				}
 			}
-			err := survey.AskOne(prompt, &version)
+			fmt.Println("hade源码从github.com中下载，github.com的连接正常")
+			// 这里下面的client都是可用的了
+			if rsp.LastPage != 0 {
+				opts = &github.ListOptions{Page: rsp.LastPage, PerPage: perPage}
+				releases, rsp, err = client.Repositories.ListReleases(context.Background(), "gohade", "hade", opts)
+				if err != nil {
+					fmt.Println("任务终止：" + err.Error())
+					return nil
+				}
+				fmt.Println(rsp.Rate.String())
+			}
+
+			fmt.Printf("最新的%v个版本\n", len(releases))
+			for _, releaseTmp := range releases {
+				fmt.Println(releaseTmp.GetTagName())
+			}
+
+			prompt := &survey.Input{
+				Message: "请输入一个版本(更多可以参考 https://github.com/gohade/hade/releases，默认为最新版本)：",
+			}
+			err = survey.AskOne(prompt, &version)
 			if err != nil {
 				return err
 			}
@@ -99,6 +174,10 @@ var newCommand = &cobra.Command{
 			}
 			if version == "" {
 				release, _, err = client.Repositories.GetLatestRelease(context.Background(), "gohade", "hade")
+				if err != nil {
+					fmt.Println("获取最新版本失败 " + err.Error())
+					return nil
+				}
 				version = release.GetTagName()
 			}
 		}
