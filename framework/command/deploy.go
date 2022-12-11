@@ -18,8 +18,11 @@ import (
 	"time"
 )
 
+var deploySkipBuild bool
+
 // initDeployCommand 为自动化部署的命令
 func initDeployCommand() *cobra.Command {
+	deployFrontendCommand.Flags().BoolVarP(&deploySkipBuild, "skip-build", "s", false, "跳过编译(default: false)")
 	deployCommand.AddCommand(deployFrontendCommand)
 	deployCommand.AddCommand(deployBackendCommand)
 	deployCommand.AddCommand(deployAllCommand)
@@ -33,7 +36,7 @@ var deployCommand = &cobra.Command{
 	Short: "部署相关命令",
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			c.Help()
+			_ = c.Help()
 		}
 		return nil
 	},
@@ -376,9 +379,11 @@ func deployBuildFrontend(c *cobra.Command, deployFolder string) error {
 	container := c.GetContainer()
 	appService := container.MustMake(contract.AppKey).(contract.App)
 
-	// 编译前端
-	if err := buildFrontendCommand.RunE(c, []string{}); err != nil {
-		return err
+	if deploySkipBuild == false {
+		// 编译前端
+		if err := buildFrontendCommand.RunE(c, []string{}); err != nil {
+			return err
+		}
 	}
 
 	// 复制前端文件到deploy文件夹

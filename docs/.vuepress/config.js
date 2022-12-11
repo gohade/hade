@@ -3,7 +3,7 @@ module.exports = {
     description: "一个支持前后端开发的基于协议的框架", //描述
     dest: "./dist/", // 设置输出目录
     port: 2333, //端口
-    base: "/v1.0/",
+    base: "/",
     head: [["link", {rel: "icon", href: "/assets/img/head.png"}]],
     themeConfig: {
         //主题配置
@@ -33,6 +33,7 @@ module.exports = {
                     children: [
                         "introduce",
                         "install",
+                        "version",
                         "build",
                         "structure",
                         "app",
@@ -46,7 +47,6 @@ module.exports = {
                         "model",
                         "util",
                         "todo",
-                        "version",
                     ],
                 },
             ],

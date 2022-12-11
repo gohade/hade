@@ -10,6 +10,8 @@ selenium-debug.log
 hade
 storage
 /deploy/
+/config/hadeoffice
+.env
 
 # Editor directories and files
 .idea
