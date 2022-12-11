@@ -25,7 +25,7 @@ func (app HadeApp) AppID() string {
 
 // Version 实现版本
 func (app HadeApp) Version() string {
-	return "0.0.3"
+	return HadeVersion
 }
 
 // BaseFolder 表示基础目录，可以代表开发场景的目录，也可以代表运行时候的目录

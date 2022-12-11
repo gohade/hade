@@ -40,6 +40,8 @@ func AddKernelCommands(root *cobra.Command) {
 	root.AddCommand(initDeployCommand())
 	// model
 	root.AddCommand(model.InitModelCommand())
+	// version
+	root.AddCommand(initVersionCommand())
 }
 
 // InitCronCommands 初始化Cron相关的命令

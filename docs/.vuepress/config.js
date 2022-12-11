@@ -46,6 +46,7 @@ module.exports = {
                         "model",
                         "util",
                         "todo",
+                        "version",
                     ],
                 },
             ],
