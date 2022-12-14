@@ -45,6 +45,7 @@ module.exports = {
                         "swagger",
                         "provider",
                         "model",
+                        "deploy",
                         "util",
                         "todo",
                     ],
