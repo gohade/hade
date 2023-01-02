@@ -171,7 +171,13 @@ var appStartCommand = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		gspt.SetProcTitle("hade app")
+
+		//processName := os.Args[0]
+		processName := "hade app"
+		if len(os.Args) > 0 {
+			processName = filepath.Base(os.Args[0]) + " app"
+		}
+		gspt.SetProcTitle(processName)
 
 		fmt.Println("app serve url:", appAddress)
 		if err := startAppServe(server, container); err != nil {

@@ -36,7 +36,7 @@ func (l *HadeLogServiceProvider) Register(c framework.Container) framework.NewIn
 		}
 
 		cs := tcs.(contract.Config)
-		l.Driver = strings.ToLower(cs.GetString("log.Driver"))
+		l.Driver = strings.ToLower(cs.GetString("log.driver"))
 	}
 
 	// 根据driver的配置项确定
