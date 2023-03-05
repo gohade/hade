@@ -4,6 +4,7 @@ import (
     "context"
     "github.com/gohade/hade/framework"
     "github.com/gohade/hade/framework/contract"
+    "github.com/pkg/errors"
     "gorm.io/driver/clickhouse"
     "gorm.io/driver/mysql"
     "gorm.io/driver/postgres"
@@ -20,6 +21,17 @@ type HadeGorm struct {
     dbs       map[string]*gorm.DB // key为dsn, value为gorm.DB（连接池）
 
     lock *sync.RWMutex
+}
+
+func (app *HadeGorm) CanConnect(ctx context.Context, db *gorm.DB) (bool, error) {
+    sqlDb, err := db.DB()
+    if err != nil {
+        return false, errors.Wrap(err, "CanConnect")
+    }
+    if err := sqlDb.Ping(); err != nil {
+        return false, errors.Wrap(err, "CanConnect Ping error")
+    }
+    return true, nil
 }
 
 // NewHadeGorm 代表实例化Gorm
