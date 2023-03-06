@@ -6,12 +6,11 @@ loc: Local # 通用配置，时区
 
 default:
     driver: mysql # 连接驱动
-    dsn: "" # dsn，如果设置了dsn, 以下的所有设置都不生效
-    host: localhost # ip地址
+    host: 127.0.0.1 # ip地址
     port: 3306 # 端口
-    database: bbs # 数据库
-    username: jianfengye # 用户名
-    password: "123456789" # 密码
+    database: test # 数据库
+    username: root # 用户名
+    password: "123456" # 密码
     charset: utf8mb4 # 字符集
     collation: utf8mb4_unicode_ci # 字符序
     timeout: 10s # 连接超时

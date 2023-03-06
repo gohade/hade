@@ -21,7 +21,7 @@ import (
 // @Router /students/delete [post]
 func (api *StudentApi) Delete(c *gin.Context) {
 	// 获取id参数
-	id, err := strconv.Atoi(c.PostForm("id"))
+	id, err := strconv.Atoi(c.Query("id"))
 	if err != nil {
 		c.JSON(400, gin.H{"error": "Invalid parameter"})
 		return
@@ -50,5 +50,5 @@ func (api *StudentApi) Delete(c *gin.Context) {
 	}
 
 	// 返回结果
-	c.Status(200)
+	c.JSON(200, gin.H{"code": 0})
 }
