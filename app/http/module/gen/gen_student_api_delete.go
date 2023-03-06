@@ -50,5 +50,5 @@ func (api *StudentApi) Delete(c *gin.Context) {
 	}
 
 	// 返回结果
-	c.JSON(200, gin.H{"code": 0})
+	c.Status(200)
 }
