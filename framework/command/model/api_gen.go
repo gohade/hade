@@ -22,15 +22,21 @@ func NewApiGenerator(table string, columns []contract.TableColumn) *ApiGenerator
 }
 
 func (gen *ApiGenerator) GenModelFile(ctx context.Context, file string) error {
+	// table lower case
+	tableLower := strings.ToLower(gen.table)
+	// table camel title case
+	tableCamel := strings.Title(tableLower)
+	// model struct
+	tableModel := tableCamel + "Model"
+
 	f := jen.NewFile("gen")
 
 	structs := make([]jen.Code, 0, len(gen.columns)+1)
-	structs = append(structs, jen.Id("gorm.Model"))
 	for _, column := range gen.columns {
 		field := jen.Id(strings.Title(column.Field))
 		switch column.Type {
 		case "int", "tinyint", "smallint", "mediumint", "bigint":
-			field.Int()
+			field.Int64()
 		case "float", "double", "decimal":
 			field.Float64()
 		case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
@@ -40,11 +46,15 @@ func (gen *ApiGenerator) GenModelFile(ctx context.Context, file string) error {
 		default:
 			field.String()
 		}
-		field.Tag(map[string]string{"gorm": column.Field})
+		field.Tag(map[string]string{"gorm": column.Field, "json": column.Field + ",omitempty"})
 		structs = append(structs, field)
 	}
 
-	f.Type().Id("StudentModel").Struct(structs...)
+	f.Type().Id(tableModel).Struct(structs...)
+	f.Line()
+	f.Func().Params(jen.Id(tableModel)).Id("TableName").Params().String().Block(
+		jen.Return(jen.Lit(gen.table)),
+	)
 
 	fp, err := os.Create(file)
 	if err != nil {
@@ -65,19 +75,18 @@ func (gen *ApiGenerator) GenRouterFile(ctx context.Context, file string) error {
 	tableApi := tableCamel + "Api"
 
 	f := jen.NewFile("gen")
-	f.ImportAlias("github.com/gohade/hade/framework/gin", "gin")
-
 	// define struct type
 	f.Type().Id(tableApi).Struct()
 
 	// define NewApi() function
-	f.Func().Id("NewApi").Params().Op("*").Id(tableApi).Block(
+	f.Func().Id("New" + tableApi).Params().Op("*").Id(tableApi).Block(
 		jen.Return(jen.Op("&").Id(tableApi).Values()),
 	)
 
 	// define Register() function
-	f.Func().Id("Register").Params(jen.Id("r").Op("*").Qual("gin", "Engine")).Error().Block(
-		jen.Id("api").Op(":=").Id("NewApi").Call(),
+	f.Func().Id(tableApi+"Register").Params(jen.Id("r").Op("*").Qual("github.com/gohade/hade/framework/gin",
+		"Engine")).Error().Block(
+		jen.Id("api").Op(":=").Id("New"+tableApi).Call(),
 		jen.Id("r").Dot("GET").Call(
 			jen.Lit("/"+tableLower+"/show"), jen.Id("api").Dot("Show"),
 		),
@@ -108,20 +117,28 @@ func (gen *ApiGenerator) GenRouterFile(ctx context.Context, file string) error {
 }
 
 func (gen *ApiGenerator) GenApiCreateFile(ctx context.Context, file string) error {
+	// table lower case
+	table := gen.table
+	tableLower := strings.ToLower(gen.table)
+	// table camel title case
+	tableCamel := strings.Title(tableLower)
+	// Api struct
+	tableApi := tableCamel + "Api"
+	tableModel := tableCamel + "Model"
 
 	f := jen.NewFile("gen")
 
 	f.Func().Params(
-		jen.Id("api").Op("*").Id("StudentApi"),
+		jen.Id("api").Op("*").Id(tableApi),
 	).Id("Create").Params(
 		jen.Id("c").Op("*").Qual("github.com/gin-gonic/gin", "Context"),
 	).Block(
 		jen.Id("logger").Op(":=").Id("c").Dot("MustMakeLog").Call(),
 
-		jen.Var().Id("student").Qual("", "StudentModel"),
+		jen.Var().Id(table).Qual("", tableModel),
 
 		jen.If(
-			jen.Err().Op(":=").Id("c").Dot("BindJSON").Call(jen.Op("&").Id("student")),
+			jen.Err().Op(":=").Id("c").Dot("BindJSON").Call(jen.Op("&").Id(table)),
 			jen.Err().Op("!=").Nil(),
 		).Block(
 			jen.Id("c").Dot("JSON").Call(jen.Lit(400), jen.Op("&").Qual("github.com/gin-gonic/gin", "H").Values(jen.Dict{
@@ -144,7 +161,7 @@ func (gen *ApiGenerator) GenApiCreateFile(ctx context.Context, file string) erro
 		),
 
 		jen.If(
-			jen.Err().Op(":=").Id("db").Dot("Create").Call(jen.Op("&").Id("student")).Dot("Error").Call(),
+			jen.Err().Op(":=").Id("db").Dot("Create").Call(jen.Op("&").Id(table)).Dot("Error").Call(),
 			jen.Err().Op("!=").Nil(),
 		).Block(
 			jen.Id("c").Dot("JSON").Call(jen.Lit(500), jen.Op("&").Qual("github.com/gin-gonic/gin", "H").Values(jen.Dict{
@@ -153,7 +170,7 @@ func (gen *ApiGenerator) GenApiCreateFile(ctx context.Context, file string) erro
 			jen.Return(),
 		),
 
-		jen.Id("c").Dot("JSON").Call(jen.Lit(200), jen.Op("&").Id("student")),
+		jen.Id("c").Dot("JSON").Call(jen.Lit(200), jen.Op("&").Id(table)),
 	)
 
 	fp, err := os.Create(file)
@@ -167,84 +184,44 @@ func (gen *ApiGenerator) GenApiCreateFile(ctx context.Context, file string) erro
 }
 
 func (gen *ApiGenerator) GenApiDeleteFile(ctx context.Context, file string) error {
+	// table lower case
+	tableLower := strings.ToLower(gen.table)
+	// table camel title case
+	tableCamel := strings.Title(tableLower)
+	// Api struct
+	tableApi := tableCamel + "Api"
+	tableModel := tableCamel + "Model"
+
 	f := jen.NewFile("gen")
 
-	// define Delete function
-	f.Func().Params(
-		jen.Id("api").Op("*").Id("StudentApi"),
-	).Id("Delete").Params(
-		jen.Id("c").Op("*").Qual("github.com/gin-gonic/gin", "Context"),
-	).Block(
-		jen.Var().Id("id").Int(),
-		jen.Var().Err().Op("=").Qual("strconv", "Atoi").Call(
-			jen.Id("c").Dot("PostForm").Call(jen.Lit("id")),
-		),
-		jen.If(
-			jen.Err().Op("!=").Nil(),
-		).Block(
-			jen.Id("c").Dot("JSON").Call(
-				jen.Lit(400),
-				jen.Dict{
-					jen.Id("error"): jen.Lit("Invalid parameter"),
-				},
-			),
+	f.Func().Params(jen.Id("api").Op("*").Id(tableApi)).Id("Delete").Params(jen.Id("c").Op("*").Qual("github."+
+		"com/gin-gonic/gin", "Context")).Block(
+		jen.Id("id, err := strconv.Atoi(c.Query(\"id\"))"),
+		jen.If(jen.Err().Op("!=").Nil()).Block(
+			jen.Id("c.JSON(400, gin.H{\"error\": \"Invalid parameter\"})"),
 			jen.Return(),
 		),
-		jen.Var().Id("logger").Op("=").Id("c").Dot("MustMakeLog").Call(),
-		jen.Var().Id("gormService").Op("=").Id("c").Dot("MustMake").Call(
-			jen.Qual("github.com/goava/di", "MustGet").Call(
-				jen.Id("contract.ORMKey"),
-			),
-		).Assert(
-			jen.Qual("contract", "ORMService"),
-		),
-		jen.Var().Id("db").Op("*").Qual("gorm.io/gorm", "DB"),
-		jen.Var().Err().Op("=").Id("gormService").Dot("GetDB").Call(
-			jen.Qual("github.com/goava/di/orm", "WithConfigPath").Call(
-				jen.Lit("database.default"),
-			),
-		),
-		jen.If(
-			jen.Err().Op("!=").Nil(),
-		).Block(
-			jen.Id("logger").Dot("Error").Call(
-				jen.Id("c"),
-				jen.Err().Dot("Error").Call(),
-				jen.Nil(),
-			),
-			jen.Id("_").Op("=").Id("c").Dot("AbortWithError").Call(
-				jen.Lit(50001),
-				jen.Err(),
-			),
+		jen.Id("logger := c.MustMakeLog()"),
+		jen.Comment("Initialize an orm.DB"),
+		jen.Id("gormService := c.MustMake(contract.ORMKey).(contract.ORMService)"),
+		jen.Id("db, err := gormService.GetDB(orm.WithConfigPath(\"database.default\"))"),
+		jen.If(jen.Err().Op("!=").Nil()).Block(
+			jen.Id("logger.Error(c, err.Error(), nil)"),
+			jen.Id("_ = c.AbortWithError(50001, err)"),
 			jen.Return(),
 		),
-		jen.Var().Err().Op("=").Id("db").Dot("Delete").Call(
-			jen.Op("&").Id("StudentModel").Values(),
-			jen.Id("id"),
-		),
-		jen.If(
-			jen.Err().Op("!=").Nil(),
-		).Block(
-			jen.If(
-				jen.Err().Op("==").Qual("gorm.io/gorm", "ErrRecordNotFound"),
-			).Block(
-				jen.Id("c").Dot("JSON").Call(
-					jen.Lit(404),
-					jen.Dict{
-						jen.Id("error"): jen.Lit("Record not found"),
-					},
-				),
+		jen.List(jen.Id("err")).Op(":=").Id("db.Delete").Call(jen.Op("&").Qual("", tableModel+"{}"),
+			jen.Id("id")).Dot("Error"),
+		jen.If(jen.Err().Op("!=").Nil()).Block(
+			jen.If(jen.Err().Op("==").Qual("github.com/jinzhu/gorm", "ErrRecordNotFound")).Block(
+				jen.Id("c.JSON(404, gin.H{\"error\": \"Record not found\"})"),
 			).Else().Block(
-				jen.Id("c").Dot("JSON").Call(
-					jen.Lit(500),
-					jen.Dict{
-						jen.Id("error"): jen.Lit("Server error"),
-					},
-				),
+				jen.Id("c.JSON(500, gin.H{\"error\": \"Server error\"})"),
 			),
 			jen.Return(),
 		),
-		jen.Id("c").Dot("Status").Call(jen.Lit(200)),
+		jen.Comment("Return result"),
+		jen.Id("c.Status(200)"),
 	)
 
 	// print generated code
