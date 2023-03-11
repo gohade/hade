@@ -180,3 +180,111 @@ func TestApiGenerator_GenDeleteFile(t *testing.T) {
 		t.Errorf("Generated code does not contain expected func name %q", expectedFuncName)
 	}
 }
+
+func TestApiGenerator_GenListFile(t *testing.T) {
+	gen := &ApiGenerator{
+		table: "user",
+		columns: []contract.TableColumn{
+			{Field: "id", Type: "int"},
+			{Field: "name", Type: "varchar"},
+			{Field: "age", Type: "int"},
+		},
+	}
+
+	// Create a temporary file for the model code
+	tmpfile, err := ioutil.TempFile("", "list.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	// Generate the model code
+	if err := gen.GenApiListFile(context.Background(), tmpfile.Name()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read the generated code from the file
+	bytes, err := ioutil.ReadFile(tmpfile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := string(bytes)
+	t.Log(code)
+
+	expectedFuncName := "List"
+	if !strings.Contains(code, expectedFuncName+"(c *gin.Context)") {
+		t.Errorf("Generated code does not contain expected func name %q", expectedFuncName)
+	}
+}
+
+func TestApiGenerator_GenShowFile(t *testing.T) {
+	gen := &ApiGenerator{
+		table: "user",
+		columns: []contract.TableColumn{
+			{Field: "id", Type: "int"},
+			{Field: "name", Type: "varchar"},
+			{Field: "age", Type: "int"},
+		},
+	}
+
+	// Create a temporary file for the model code
+	tmpfile, err := ioutil.TempFile("", "show.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	// Generate the model code
+	if err := gen.GenApiListFile(context.Background(), tmpfile.Name()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read the generated code from the file
+	bytes, err := ioutil.ReadFile(tmpfile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := string(bytes)
+	t.Log(code)
+
+	expectedFuncName := "Show"
+	if !strings.Contains(code, expectedFuncName+"(c *gin.Context)") {
+		t.Errorf("Generated code does not contain expected func name %q", expectedFuncName)
+	}
+}
+
+func TestApiGenerator_GenUpdateFile(t *testing.T) {
+	gen := &ApiGenerator{
+		table: "user",
+		columns: []contract.TableColumn{
+			{Field: "id", Type: "int"},
+			{Field: "name", Type: "varchar"},
+			{Field: "age", Type: "int"},
+		},
+	}
+
+	// Create a temporary file for the model code
+	tmpfile, err := ioutil.TempFile("", "update.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tmpfile.Name())
+
+	// Generate the model code
+	if err := gen.GenApiListFile(context.Background(), tmpfile.Name()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Read the generated code from the file
+	bytes, err := ioutil.ReadFile(tmpfile.Name())
+	if err != nil {
+		t.Fatal(err)
+	}
+	code := string(bytes)
+	t.Log(code)
+
+	expectedFuncName := "Update"
+	if !strings.Contains(code, expectedFuncName+"(c *gin.Context)") {
+		t.Errorf("Generated code does not contain expected func name %q", expectedFuncName)
+	}
+}

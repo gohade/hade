@@ -30,6 +30,7 @@ func InitModelCommand() *cobra.Command {
 	modelApiCommand.Flags().StringVarP(&database, "database", "d", "database.default", "模型连接的数据库")
 	modelApiCommand.Flags().StringVarP(&table, "table", "t", "default", "模型连接的数据表")
 	modelApiCommand.Flags().StringVarP(&output, "output", "o", "", "模型输出地址, 文件夹地址")
+	modelCommand.AddCommand(modelApiCommand)
 	return modelCommand
 }
 

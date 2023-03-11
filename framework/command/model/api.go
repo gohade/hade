@@ -37,6 +37,21 @@ var modelApiCommand = &cobra.Command{
 			return err
 		}
 
+		tables, err := gormService.GetTables(ctx, db)
+		if err != nil {
+			return errors.Wrap(err, "获取数据库表格失败")
+		}
+
+		table := ""
+		{
+			// 第一步是一个交互命令行工具，首先展示要生成的表列表选择：
+			prompt := &survey.Select{
+				Message: "请选择要生成模型的表格：",
+				Options: tables,
+			}
+			survey.AskOne(prompt, &table)
+		}
+
 		hasTable, err := gormService.HasTable(ctx, db, table)
 		if err != nil {
 			return fmt.Errorf("数据库连接失败，表格 %v, 错误 %v", table, err)
@@ -95,8 +110,43 @@ var modelApiCommand = &cobra.Command{
 		}
 
 		apiGenerator := NewApiGenerator(table, columns)
+		// get folder last string split by path separator
+		apiGenerator.SetPackageName(strings.ToLower(filepath.Base(folder)))
+
 		if err := apiGenerator.GenModelFile(ctx, modelFile); err != nil {
 			return errors.Wrap(err, "GenModelFile error")
+		}
+		if err := apiGenerator.GenRouterFile(ctx, routerFile); err != nil {
+			return errors.Wrap(err, "GenRouterFile error")
+		}
+		if err := apiGenerator.GenApiCreateFile(ctx, apiCreateFile); err != nil {
+			return errors.Wrap(err, "GenApiCreateFile error")
+		}
+		if err := apiGenerator.GenApiDeleteFile(ctx, apiDeleteFile); err != nil {
+			return errors.Wrap(err, "GenApiDeleteFile error")
+		}
+		if err := apiGenerator.GenApiListFile(ctx, apiListFile); err != nil {
+			return errors.Wrap(err, "GenApiListFile error")
+		}
+		if err := apiGenerator.GenApiShowFile(ctx, apiShowFile); err != nil {
+			return errors.Wrap(err, "GenApiShowFile error")
+		}
+		if err := apiGenerator.GenApiUpdateFile(ctx, apiUpdateFile); err != nil {
+			return errors.Wrap(err, "GenApiUpdateFile error")
+		}
+
+		// 检测会重新生成如下文件
+		{
+			getFileTip := func(file string) string {
+				return "[成功] " + file
+			}
+			fmt.Println(getFileTip(modelFile))
+			fmt.Println(getFileTip(routerFile))
+			fmt.Println(getFileTip(apiCreateFile))
+			fmt.Println(getFileTip(apiDeleteFile))
+			fmt.Println(getFileTip(apiListFile))
+			fmt.Println(getFileTip(apiShowFile))
+			fmt.Println(getFileTip(apiUpdateFile))
 		}
 
 		return nil

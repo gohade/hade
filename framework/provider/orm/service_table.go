@@ -24,7 +24,7 @@ func (app *HadeGorm) HasTable(ctx context.Context, db *gorm.DB, table string) (b
 func (app *HadeGorm) GetTableColumns(ctx context.Context, db *gorm.DB, table string) ([]contract.TableColumn, error) {
 	// 执行原始的SQL语句
 	var columns []contract.TableColumn
-	result := db.Raw("SHOW COLUMNS FROM ?", table).Scan(&columns)
+	result := db.Raw("SHOW COLUMNS FROM " + table).Scan(&columns)
 	if result.Error != nil {
 		// 处理错误
 		return nil, result.Error
