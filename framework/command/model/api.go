@@ -2,14 +2,16 @@ package model
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/gohade/hade/framework/cobra"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/provider/orm"
 	"github.com/gohade/hade/framework/util"
 	"github.com/pkg/errors"
-	"path/filepath"
-	"strings"
 )
 
 // modelApiCommand 生成api
@@ -113,6 +115,12 @@ var modelApiCommand = &cobra.Command{
 		// get folder last string split by path separator
 		apiGenerator.SetPackageName(strings.ToLower(filepath.Base(folder)))
 
+		if !util.Exists(folder) {
+			if err := os.Mkdir(folder, 0755); err != nil {
+				return errors.Wrap(err, "create folder error")
+			}
+		}
+
 		if err := apiGenerator.GenModelFile(ctx, modelFile); err != nil {
 			return errors.Wrap(err, "GenModelFile error")
 		}
@@ -149,6 +157,10 @@ var modelApiCommand = &cobra.Command{
 			fmt.Println(getFileTip(apiUpdateFile))
 		}
 
+		fmt.Println("=======================")
+		fmt.Println("生成结束，请记得挂载路由到route.go中")
+		fmt.Println("!!! hade代码生成器按照既定程序生成文件，请自行仔细检查代码逻辑 !!!")
+		fmt.Println("=======================")
 		return nil
 	},
 }

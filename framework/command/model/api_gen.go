@@ -1,13 +1,14 @@
 package model
 
 import (
-    "context"
-    "github.com/dave/jennifer/jen"
-    "github.com/gohade/hade/framework/contract"
-    "github.com/gohade/hade/framework/util/word"
-    "github.com/pkg/errors"
-    "os"
-    "strings"
+	"context"
+	"os"
+	"strings"
+
+	"github.com/dave/jennifer/jen"
+	"github.com/gohade/hade/framework/contract"
+	"github.com/gohade/hade/framework/util/word"
+	"github.com/pkg/errors"
 )
 
 type ApiGenerator struct {
@@ -136,8 +137,21 @@ func (gen *ApiGenerator) GenApiCreateFile(ctx context.Context, file string) erro
 	tableApi := tableCamel + "Api"
 	tableModel := tableCamel + "Model"
 
+	comment := ` Create create ${table}
+ @Summary create ${table}
+ @Produce json
+ @Tags ${table}
+ @Param ${table} body ${tableModel} true "${tableModel}"
+ @Success 200 {object} ${tableModel}
+ @Failure 400 {object} gin.H
+ @Failure 500 {object} gin.H
+ @Router /${table}/create [post]`
+	comment = strings.ReplaceAll(comment, "${tableModel}", tableModel)
+	comment = strings.ReplaceAll(comment, "${table}", tableLower)
+
 	f := jen.NewFile(gen.packageName)
 
+	f.Comment(comment)
 	f.Func().Params(
 		jen.Id("api").Op("*").Id(tableApi),
 	).Id("Create").Params(
@@ -204,6 +218,22 @@ func (gen *ApiGenerator) GenApiDeleteFile(ctx context.Context, file string) erro
 
 	f := jen.NewFile(gen.packageName)
 
+	comment := ` Delete godoc
+ @Summary Delete a ${table} by ID
+ @Description Delete a ${table} by ID
+ @Tags ${table}
+ @Accept  json
+ @Produce  json
+ @Param id query int true "ID"
+ @Success 200 {string} string "success"
+ @Failure 400 {object} ErrorResponse "Invalid parameter"
+ @Failure 404 {object} ErrorResponse "Record not found"
+ @Failure 500 {object} ErrorResponse "Server error"
+ @Router /${table}/delete [post]`
+	comment = strings.ReplaceAll(comment, "${tableModel}", tableModel)
+	comment = strings.ReplaceAll(comment, "${table}", tableLower)
+
+	f.Comment(comment)
 	f.Func().Params(
 		jen.Id("api").Op("*").Id(tableApi),
 	).Id("Delete").Params(
@@ -269,6 +299,22 @@ func (gen *ApiGenerator) GenApiListFile(ctx context.Context, file string) error 
 
 	f := jen.NewFile(gen.packageName)
 
+	comment := ` List godoc
+ @Summary Get a list of ${table}
+ @Description Get a list of ${table} with pagination support
+ @Tags ${table}
+ @Accept json
+ @Produce json
+ @Param offset query integer true "offset"
+ @Param size query integer true "size"
+ @Success 200 {object} gin.H
+ @Failure 400 {object} gin.H
+ @Failure 500 {object} gin.H
+ @Router /${table}/list [get]`
+	comment = strings.ReplaceAll(comment, "${tableModel}", tableModel)
+	comment = strings.ReplaceAll(comment, "${table}", tableLower)
+
+	f.Comment(comment)
 	f.Func().Params(jen.Id("api").Op("*").Id(tableApi)).Id("List").Params(jen.Id("c").Op("*").Qual("github.com/gohade/hade/framework/gin", "Context")).Block(
 		jen.List(jen.Id("offset"), jen.Id("err")).Op(":=").Qual("strconv",
 			"Atoi").Call(jen.Id("c").Dot("Query").Call(jen.Lit("offset"))),
@@ -332,6 +378,22 @@ func (gen *ApiGenerator) GenApiShowFile(ctx context.Context, file string) error 
 
 	f := jen.NewFile(gen.packageName)
 
+	comment := ` Show godoc
+ @Summary Get a ${table} by ID
+ @Description Get a ${table} by ID
+ @Tags ${table}
+ @Accept json
+ @Produce json
+ @Param id query integer true "${table} ID"
+ @Success 200 {object} ${tableModel}
+ @Failure 400 {object} gin.H
+ @Failure 404 {object} gin.H
+ @Failure 500 {object} gin.H
+ @Router /${table}/{id} [get]`
+	comment = strings.ReplaceAll(comment, "${tableModel}", tableModel)
+	comment = strings.ReplaceAll(comment, "${table}", tableLower)
+
+	f.Comment(comment)
 	f.Func().Params(jen.Id("api").Op("*").Id(tableApi)).Id("Show").Params(jen.Id("c").Op("*").Qual("github.com/gohade/hade/framework/gin", "Context")).Block(
 
 		jen.List(jen.Id("id"), jen.Id("err")).Op(":=").Qual("strconv", "Atoi").Call(jen.Id("c").Dot("Query").Call(jen.Lit("id"))),
@@ -387,7 +449,23 @@ func (gen *ApiGenerator) GenApiUpdateFile(ctx context.Context, file string) erro
 	tableModel := tableCamel + "Model"
 
 	f := jen.NewFile(gen.packageName)
+	comment := ` Update godoc
+ @Summary Update a ${table} by ID
+ @Description Update a ${table} by ID
+ @Tags ${table}
+ @Accept  json
+ @Produce  json
+ @Param id query int true "ID of the ${table} to update"
+ @Param student body ${tableModel} true "${table} information to update"
+ @Success 200 {object} ${tableModel}
+ @Failure 400 {object} gin.H
+ @Failure 404 {object} gin.H
+ @Failure 500 {object} gin.H
+ @Router /${table}/update [post]`
+	comment = strings.ReplaceAll(comment, "${tableModel}", tableModel)
+	comment = strings.ReplaceAll(comment, "${table}", tableLower)
 
+	f.Comment(comment)
 	f.Func().Params(jen.Id("api").Op("*").Id(tableApi)).Id("Update").Params(jen.Id("c").Op("*").Qual("github.com/gohade/hade/framework/gin", "Context")).Block(
 		jen.List(jen.Id("id"), jen.Id("err")).Op(":=").Qual("strconv", "Atoi").Call(jen.Id("c").Dot("Query").Call(jen.Lit("id"))),
 		jen.If(jen.Err().Op("!=").Nil()).Block(

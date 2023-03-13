@@ -1,4 +1,4 @@
 package app
 
 // HadeVersion hade的版本
-const HadeVersion = "1.0.5"
+const HadeVersion = "1.0.6"
