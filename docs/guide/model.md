@@ -27,7 +27,7 @@ Flags:
 * ./hade model gen 通过数据表自动生成model代码
 * ./hade model test 测试某个数据库是否可以连接
 
-## ./hade test
+## ./hade model test
 
 当你想测试下你的某个配置好的数据库是否能连接上，都有哪些表的时候，这个命令能帮助你。
 
