@@ -3,6 +3,8 @@ import {searchPlugin} from '@vuepress/plugin-search'
 import {mdEnhancePlugin} from "vuepress-plugin-md-enhance";
 import {copyCodePlugin} from "vuepress-plugin-copy-code2";
 import {tocPlugin} from '@vuepress/plugin-toc'
+import {googleAnalyticsPlugin} from '@vuepress/plugin-google-analytics'
+
 
 export default {
     title: "hade框架", // 设置网站标题
@@ -79,6 +81,9 @@ export default {
         }),
         tocPlugin({
             // 配置项
+        }),
+        googleAnalyticsPlugin({
+            id: 'G-TTJKZDD7LR',
         }),
 
     ]

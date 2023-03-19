@@ -21,3 +21,5 @@ storage
 *.njsproj
 *.sln
 hade.exe
+docs/.vuepress/.temp/
+docs/.vuepress/.cache/

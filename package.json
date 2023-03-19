@@ -23,5 +23,8 @@
         "> 1%",
         "last 2 versions",
         "not ie <= 8"
-    ]
+    ],
+    "dependencies": {
+        "@vuepress/plugin-google-analytics": "^2.0.0-beta.61"
+    }
 }
