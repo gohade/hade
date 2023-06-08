@@ -1,8 +1,10 @@
 package util
 
 import (
+	"fmt"
 	"os"
-	"syscall"
+	"os/exec"
+	"strings"
 )
 
 // GetExecDirectory 获取当前执行程序目录
@@ -16,18 +18,14 @@ func GetExecDirectory() string {
 
 // CheckProcessExist 检查进程pid是否存在，如果存在的话，返回true
 func CheckProcessExist(pid int) bool {
-	// 查询这个pid
-	process, err := os.FindProcess(pid)
+	cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid))
+	output, err := cmd.Output()
 	if err != nil {
 		return false
 	}
 
-	// 给进程发送signal 0, 如果返回nil，代表进程存在, 否则进程不存在
-	err = process.Signal(syscall.Signal(0))
-	if err != nil {
-		return false
-	}
-	return true
+	// 检查输出中是否包含进程名称
+	return strings.Contains(string(output), fmt.Sprintf("%d", pid))
 }
 
 // KillProcess kill process by pid
