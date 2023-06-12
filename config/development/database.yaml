@@ -19,3 +19,4 @@ default:
     parse_time: true # 是否解析时间
     protocol: tcp # 传输协议
     loc: Local # 时区
+    allow_native_passwords: true # 指定原生密码身份验证
