@@ -8,7 +8,7 @@ import (
 )
 
 const (
-    BasePath = ""
+    BasePath = "" // 自定义
 )
 
 func GetBasePath() string {
