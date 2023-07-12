@@ -17,6 +17,7 @@ import (
 	"github.com/gohade/hade/framework/provider/log"
 	"github.com/gohade/hade/framework/provider/orm"
 	"github.com/gohade/hade/framework/provider/redis"
+	"github.com/gohade/hade/framework/provider/sls"
 	"github.com/gohade/hade/framework/provider/ssh"
 	"github.com/gohade/hade/framework/provider/trace"
 )
@@ -37,6 +38,7 @@ func main() {
 	container.Bind(&redis.RedisProvider{})
 	container.Bind(&cache.HadeCacheProvider{})
 	container.Bind(&ssh.SSHProvider{})
+	container.Bind(&sls.HadeSLSProvider{})
 
 	// 将HTTP引擎初始化,并且作为服务提供者绑定到服务容器中
 	if engine, err := http.NewHttpEngine(container); err == nil {

@@ -49,6 +49,8 @@ func (l *HadeLogServiceProvider) Register(c framework.Container) framework.NewIn
 		return services.NewHadeConsoleLog
 	case "custom":
 		return services.NewHadeCustomLog
+	case "aliyun_sls":
+		return services.NewHadeSlsLog
 	default:
 		return services.NewHadeConsoleLog
 	}
