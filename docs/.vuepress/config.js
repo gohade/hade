@@ -47,6 +47,7 @@ export default {
                         "model",
                         "deploy",
                         "util",
+                        "grpc",
                         "todo",
                     ],
                 },
