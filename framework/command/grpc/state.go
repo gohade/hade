@@ -11,15 +11,15 @@ import (
 	"github.com/gohade/hade/framework/util"
 )
 
-// 停止一个已经启动的app服务
-var grpcStopCommand = &cobra.Command{
-	Use:   "stop",
-	Short: "停止一个已经启动的grpc服务",
+// 获取启动的app的pid
+var grpcStateCommand = &cobra.Command{
+	Use:   "state",
+	Short: "获取启动的grpc的pid",
 	RunE: func(c *cobra.Command, args []string) error {
 		container := c.GetContainer()
 		appService := container.MustMake(contract.AppKey).(contract.App)
 
-		// GetPid
+		// 获取pid
 		serverPidFile := filepath.Join(appService.RuntimeFolder(), "grpc.pid")
 
 		content, err := ioutil.ReadFile(serverPidFile)
@@ -27,19 +27,17 @@ var grpcStopCommand = &cobra.Command{
 			return err
 		}
 
-		if content != nil && len(content) != 0 {
+		if content != nil && len(content) > 0 {
 			pid, err := strconv.Atoi(string(content))
 			if err != nil {
 				return err
 			}
-			if err := util.KillProcess(pid); err != nil {
-				return err
+			if util.CheckProcessExist(pid) {
+				fmt.Println("grpc服务已经启动, pid:", pid)
+				return nil
 			}
-			if err := ioutil.WriteFile(serverPidFile, []byte{}, 0644); err != nil {
-				return err
-			}
-			fmt.Println("停止进程:", pid)
 		}
+		fmt.Println("没有grpc服务存在")
 		return nil
 	},
 }
