@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	pb "github.com/gohade/hade/app/grpc/proto/helloworld"
+	pb "github.com/gohade/hade/app/grpc/proto/examples/helloworld"
 )
 
 // Server is used to implement helloworld.GreeterServer.
