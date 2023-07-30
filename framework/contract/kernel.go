@@ -2,6 +2,8 @@ package contract
 
 import (
 	"net/http"
+
+	"google.golang.org/grpc"
 )
 
 const KernelKey = "hade:kernel"
@@ -10,4 +12,6 @@ const KernelKey = "hade:kernel"
 type Kernel interface {
 	// HttpEngine 提供gin的Engine结构
 	HttpEngine() http.Handler
+	// GrpcEngine 提供grpc的Engine结构
+	GrpcEngine() *grpc.Server
 }
