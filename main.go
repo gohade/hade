@@ -39,6 +39,7 @@ func main() {
 	_ = container.Bind(&redis.RedisProvider{})
 	_ = container.Bind(&cache.HadeCacheProvider{})
 	_ = container.Bind(&ssh.SSHProvider{})
+	_ = container.Bind(&sls.HadeSLSProvider{})
 
 	// 将HTTP和grpc引擎初始化,并且作为服务提供者绑定到服务容器中
 	kernelProvider := &kernel.HadeKernelProvider{}
