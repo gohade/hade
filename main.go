@@ -18,6 +18,7 @@ import (
 	"github.com/gohade/hade/framework/provider/log"
 	"github.com/gohade/hade/framework/provider/orm"
 	"github.com/gohade/hade/framework/provider/redis"
+	"github.com/gohade/hade/framework/provider/sls"
 	"github.com/gohade/hade/framework/provider/ssh"
 	"github.com/gohade/hade/framework/provider/trace"
 )
