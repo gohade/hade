@@ -260,6 +260,12 @@ func deployUploadAction(deployFolder string, container framework.Container, end 
 			bts, err := session.CombinedOutput(action)
 			if err != nil {
 				session.Close()
+				logger.Error(context.Background(), "execute pre action failed", map[string]interface{}{
+					"err":        err,
+					"cmd":        action,
+					"connection": node,
+					"output":     string(bts),
+				})
 				return err
 			}
 			session.Close()
