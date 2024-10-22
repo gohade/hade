@@ -3,6 +3,13 @@ package command
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/cobra"
 	"github.com/gohade/hade/framework/contract"
@@ -10,12 +17,6 @@ import (
 	"github.com/gohade/hade/framework/util"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 var deploySkipBuild bool
@@ -158,12 +159,16 @@ func deployBuildBackend(c *cobra.Command, deployFolder string) error {
 	deployBinFile := filepath.Join(deployFolder, binFile)
 	cmd := exec.Command(path, "build", "-o", deployBinFile, "./")
 	cmd.Env = os.Environ()
-	// 设置GOOS和GOARCH
+	// 设置GOOS和GOARCH,如果设置了交叉编译工具链，则设置CGO_ENABLED=1
 	if configService.GetString("deploy.backend.goos") != "" {
 		cmd.Env = append(cmd.Env, "GOOS="+configService.GetString("deploy.backend.goos"))
 	}
 	if configService.GetString("deploy.backend.goarch") != "" {
 		cmd.Env = append(cmd.Env, "GOARCH="+configService.GetString("deploy.backend.goarch"))
+	}
+	if configService.GetString("deploy.backend.gocc") != "" {
+		cmd.Env = append(cmd.Env, "CGO_ENABLED=1")
+		cmd.Env = append(cmd.Env, "CC="+configService.GetString("deploy.backend.gocc"))
 	}
 
 	// 执行命令
@@ -173,6 +178,7 @@ func deployBuildBackend(c *cobra.Command, deployFolder string) error {
 		logger.Error(ctx, "go build err", map[string]interface{}{
 			"err": err,
 			"out": string(out),
+			"cmd": cmd.String(),
 		})
 		return err
 	}
@@ -403,6 +409,13 @@ func deployBuildFrontend(c *cobra.Command, deployFolder string) error {
 func createDeployFolder(c framework.Container) (string, error) {
 	appService := c.MustMake(contract.AppKey).(contract.App)
 	deployFolder := appService.DeployFolder()
+
+	// 如果部署文件夹不存在，则创建
+	if !util.Exists(deployFolder) {
+		if err := os.Mkdir(deployFolder, os.ModePerm); err != nil {
+			return "", err
+		}
+	}
 
 	deployVersion := time.Now().Format("20060102150405")
 	versionFolder := filepath.Join(deployFolder, deployVersion)
