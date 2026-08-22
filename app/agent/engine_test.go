@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -57,19 +58,34 @@ func TestAgentEngineSessionAndMessagesSSE(t *testing.T) {
 		So(messages.Code, ShouldEqual, http.StatusOK)
 		So(messages.Header().Get("Content-Type"), ShouldStartWith, "text/event-stream")
 
-		output := messages.Body.String()
-		for _, eventType := range []string{
+		frames, err := parseSSEFrames(messages.Body.String())
+		So(err, ShouldBeNil)
+		So(frames, ShouldHaveLength, 7)
+
+		eventTypes := make([]string, len(frames))
+		ids := make([]int, len(frames))
+		data := make([]map[string]interface{}, len(frames))
+		for i, frame := range frames {
+			eventTypes[i] = frame.Event
+			ids[i] = frame.ID
+			So(json.Unmarshal(frame.Data, &data[i]), ShouldBeNil)
+		}
+		So(eventTypes, ShouldResemble, []string{
 			contract.EventSession,
 			contract.EventThought,
 			contract.EventAction,
 			contract.EventObservation,
+			contract.EventThought,
 			contract.EventFinal,
 			contract.EventDone,
-		} {
-			So(strings.Contains(output, "event:"+eventType), ShouldBeTrue)
-		}
-		So(strings.Count(output, "event:"+contract.EventDone), ShouldEqual, 1)
-		So(sseIDs(output), ShouldResemble, []int{1, 2, 3, 4, 5, 6, 7})
+		})
+		So(ids, ShouldResemble, []int{1, 2, 3, 4, 5, 6, 7})
+
+		So(data[0]["session_id"], ShouldEqual, created.ID)
+		So(data[2]["name"], ShouldEqual, "echo")
+		So(data[2]["arguments"], ShouldResemble, map[string]interface{}{"text": "hi"})
+		So(data[5]["content"], ShouldEqual, "bye")
+		So(data[6], ShouldResemble, map[string]interface{}{})
 	})
 }
 
@@ -145,18 +161,40 @@ func assertJSONError(response *httptest.ResponseRecorder, status int, message st
 	So(response.Header().Get("Content-Type"), ShouldNotStartWith, "text/event-stream")
 }
 
-func sseIDs(body string) []int {
-	var ids []int
-	for _, line := range strings.Split(body, "\n") {
-		if !strings.HasPrefix(line, "id:") {
-			continue
+type sseFrame struct {
+	ID    int
+	Event string
+	Data  json.RawMessage
+}
+
+func parseSSEFrames(body string) ([]sseFrame, error) {
+	normalized := strings.ReplaceAll(body, "\r\n", "\n")
+	blocks := strings.Split(strings.TrimSpace(normalized), "\n\n")
+	frames := make([]sseFrame, 0, len(blocks))
+	for _, block := range blocks {
+		var frame sseFrame
+		var dataLines []string
+		for _, line := range strings.Split(block, "\n") {
+			switch {
+			case strings.HasPrefix(line, "id:"):
+				id, err := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(line, "id:")))
+				if err != nil {
+					return nil, fmt.Errorf("invalid SSE id %q: %w", line, err)
+				}
+				frame.ID = id
+			case strings.HasPrefix(line, "event:"):
+				frame.Event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
+			case strings.HasPrefix(line, "data:"):
+				dataLines = append(dataLines, strings.TrimSpace(strings.TrimPrefix(line, "data:")))
+			}
 		}
-		id, err := strconv.Atoi(strings.TrimPrefix(line, "id:"))
-		if err == nil {
-			ids = append(ids, id)
+		if frame.ID == 0 || frame.Event == "" || len(dataLines) == 0 {
+			return nil, fmt.Errorf("incomplete SSE frame %q", block)
 		}
+		frame.Data = json.RawMessage(strings.Join(dataLines, "\n"))
+		frames = append(frames, frame)
 	}
-	return ids
+	return frames, nil
 }
 
 type agentStub struct {
