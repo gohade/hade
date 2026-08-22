@@ -25,14 +25,8 @@ func newAgentStopCommand(deps agentDependencies) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			appService := c.GetContainer().MustMake(contract.AppKey).(contract.App)
 			serverPidFile := filepath.Join(appService.RuntimeFolder(), "agent.pid")
-			pid, exists, err := readPIDFile(serverPidFile)
+			pid, err := stopAgentProcess(serverPidFile, deps.process, agentStopWait(c))
 			if err != nil {
-				return err
-			}
-			if !exists {
-				return nil
-			}
-			if err := stopAgentProcess(serverPidFile, deps.executable, deps.process, agentStopWait(c)); err != nil {
 				return err
 			}
 			fmt.Println("停止 agent 服务进程:", pid)

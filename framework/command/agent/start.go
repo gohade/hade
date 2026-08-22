@@ -125,17 +125,7 @@ func newAgentStartCommand(options *agentOptions) *cobra.Command {
 			server := &http.Server{Handler: core, Addr: address}
 
 			if options.daemon {
-				probe, err := net.Listen("tcp", address)
-				if err != nil {
-					return err
-				}
-				if err := probe.Close(); err != nil {
-					return err
-				}
-
 				cntxt := &daemon.Context{
-					PidFileName: serverPidFile,
-					PidFilePerm: 0664,
 					LogFileName: serverLogFile,
 					LogFilePerm: 0640,
 					WorkDir:     util.GetExecDirectory(),
@@ -148,15 +138,30 @@ func newAgentStartCommand(options *agentOptions) *cobra.Command {
 					return err
 				}
 				if d != nil {
+					probes := defaultDaemonReadinessProbes(serverPidFile, address, d.Pid)
+					if err := waitDaemonReady(d.Pid, 5*time.Second, probes); err != nil {
+						_ = d.Signal(syscall.SIGTERM)
+						return err
+					}
 					printAgentStarted(processName, strconv.Itoa(d.Pid), address, appService)
 					return nil
 				}
-				defer cntxt.Release()
 				currentPID := os.Getpid()
-				defer cleanupPIDFile(serverPidFile, currentPID)
+				owner, err := acquirePIDFile(serverPidFile, currentPID)
+				if err != nil {
+					return err
+				}
+				defer owner.cleanup()
 				gspt.SetProcTitle(processName)
 				return startAgentServe(server, closeWait)
 			}
+
+			currentPID := os.Getpid()
+			owner, err := acquirePIDFile(serverPidFile, currentPID)
+			if err != nil {
+				return err
+			}
+			defer owner.cleanup()
 
 			listener, err := net.Listen("tcp", address)
 			if err != nil {
@@ -164,13 +169,7 @@ func newAgentStartCommand(options *agentOptions) *cobra.Command {
 			}
 			defer listener.Close()
 
-			currentPID := os.Getpid()
 			content := strconv.Itoa(currentPID)
-			if err := os.WriteFile(serverPidFile, []byte(content), 0644); err != nil {
-				return err
-			}
-			defer cleanupPIDFile(serverPidFile, currentPID)
-
 			gspt.SetProcTitle(processName)
 			printAgentStarted(processName, content, address, appService)
 			return serveAgent(server, func() error { return server.Serve(listener) }, closeWait)

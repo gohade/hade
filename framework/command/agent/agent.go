@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"os"
 	"path/filepath"
 
 	"github.com/gohade/hade/framework/cobra"
@@ -45,21 +44,19 @@ func newAgentOptions() *agentOptions {
 }
 
 type agentDependencies struct {
-	process    processOperations
-	executable string
+	process processOperations
 }
 
 // InitAgentCommand 每次创建独立的 Agent 命令树与选项状态。
 func InitAgentCommand() *cobra.Command {
 	options := newAgentOptions()
 	deps := agentDependencies{
-		process:    defaultProcessOperations(),
-		executable: filepath.Base(os.Args[0]),
+		process: defaultProcessOperations(),
 	}
 	startCommand := newAgentStartCommand(options)
 	stopCommand := newAgentStopCommand(deps)
 	restartCommand := newAgentRestartCommand(options, stopCommand, startCommand)
-	stateCommand := newAgentStateCommand(deps)
+	stateCommand := newAgentStateCommand()
 	agentCommand := newAgentRootCommand()
 
 	startCommand.Flags().BoolVarP(&options.daemon, "daemon", "d", false, "开启后台模式")
