@@ -1,6 +1,14 @@
 package agent
 
-import "testing"
+import (
+	"net"
+	"net/http"
+	"reflect"
+	"testing"
+	"time"
+
+	"github.com/gohade/hade/framework/cobra"
+)
 
 func TestResolveAgentAddressPriority(t *testing.T) {
 	tests := []struct {
@@ -37,4 +45,67 @@ func TestNormalizeAgentAddress(t *testing.T) {
 			t.Fatalf("normalizeAgentAddress(%q) = %q, want %q", input, got, want)
 		}
 	}
+}
+
+func TestInitAgentCommandCanBeCalledTwiceWithoutStateLeak(t *testing.T) {
+	first := InitAgentCommand()
+	firstStart := findSubcommand(t, first, "start")
+	if err := firstStart.Flags().Set("address", ":9999"); err != nil {
+		t.Fatal(err)
+	}
+	if err := firstStart.Flags().Set("daemon", "true"); err != nil {
+		t.Fatal(err)
+	}
+
+	second := InitAgentCommand()
+	secondStart := findSubcommand(t, second, "start")
+	if got := secondStart.Flags().Lookup("address").Value.String(); got != "" {
+		t.Fatalf("second address leaked: %q", got)
+	}
+	if got := secondStart.Flags().Lookup("daemon").Value.String(); got != "false" {
+		t.Fatalf("second daemon leaked: %q", got)
+	}
+}
+
+func TestStartAgentServeReturnsListenerError(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	server := &http.Server{Addr: listener.Addr().String()}
+	err = startAgentServe(server, time.Second)
+	if err == nil {
+		t.Fatal("expected occupied address error")
+	}
+}
+
+func TestBuildDaemonArgsPreservesSpaceFormValues(t *testing.T) {
+	options := newAgentOptions()
+	options.address = "127.0.0.1:9999"
+	*options.folderValues["runtime_folder"] = "/tmp/runtime folder"
+	*options.folderValues["config_folder"] = "/tmp/config folder"
+
+	got := buildDaemonArgs("hade", options)
+	want := []string{
+		"hade", "agent", "start", "--daemon=true",
+		"--address", "127.0.0.1:9999",
+		"--config_folder", "/tmp/config folder",
+		"--runtime_folder", "/tmp/runtime folder",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
+func findSubcommand(t *testing.T, root interface{ Commands() []*cobra.Command }, name string) *cobra.Command {
+	t.Helper()
+	for _, command := range root.Commands() {
+		if command.Name() == name {
+			return command
+		}
+	}
+	t.Fatalf("subcommand %q not found", name)
+	return nil
 }

@@ -1,9 +1,11 @@
 package agent
 
-import "github.com/gohade/hade/framework/cobra"
+import (
+	"os"
+	"path/filepath"
 
-var agentAddress string
-var agentDaemon bool
+	"github.com/gohade/hade/framework/cobra"
+)
 
 var agentStartArgs = []string{
 	"base_folder",
@@ -27,36 +29,79 @@ var agentOtherArgs = []string{
 	"base_folder",
 }
 
-// InitAgentCommand 获取 Agent 服务相关命令。
-func InitAgentCommand() *cobra.Command {
-	agentStartCommand.Flags().BoolVarP(&agentDaemon, "daemon", "d", false, "开启后台模式")
-	agentStartCommand.Flags().StringVar(&agentAddress, "address", "", "设置 agent 启动地址，默认为 :8889")
+type agentOptions struct {
+	address      string
+	daemon       bool
+	folderValues map[string]*string
+}
 
+func newAgentOptions() *agentOptions {
+	options := &agentOptions{folderValues: make(map[string]*string, len(agentStartArgs))}
+	for _, name := range agentStartArgs {
+		value := ""
+		options.folderValues[name] = &value
+	}
+	return options
+}
+
+type agentDependencies struct {
+	process    processOperations
+	executable string
+}
+
+// InitAgentCommand 每次创建独立的 Agent 命令树与选项状态。
+func InitAgentCommand() *cobra.Command {
+	options := newAgentOptions()
+	deps := agentDependencies{
+		process:    defaultProcessOperations(),
+		executable: filepath.Base(os.Args[0]),
+	}
+	startCommand := newAgentStartCommand(options)
+	stopCommand := newAgentStopCommand(deps)
+	restartCommand := newAgentRestartCommand(options, stopCommand, startCommand)
+	stateCommand := newAgentStateCommand(deps)
+	agentCommand := newAgentRootCommand()
+
+	startCommand.Flags().BoolVarP(&options.daemon, "daemon", "d", false, "开启后台模式")
+	startCommand.Flags().StringVar(&options.address, "address", "", "设置 agent 启动地址，默认为 :8889")
 	for _, arg := range agentStartArgs {
-		tmp := ""
-		agentStartCommand.Flags().StringVar(&tmp, arg, "", "base config for agent service: "+arg)
+		startCommand.Flags().StringVar(options.folderValues[arg], arg, "", "base config for agent service: "+arg)
 	}
 	for _, arg := range agentOtherArgs {
-		tmp := ""
-		agentRestartCommand.Flags().StringVar(&tmp, arg, "", "base config for agent service: "+arg)
-		agentStateCommand.Flags().StringVar(&tmp, arg, "", "base config for agent service: "+arg)
-		agentStopCommand.Flags().StringVar(&tmp, arg, "", "base config for agent service: "+arg)
+		restartCommand.Flags().StringVar(options.folderValues[arg], arg, "", "base config for agent service: "+arg)
+		stateCommand.Flags().String(arg, "", "base config for agent service: "+arg)
+		stopCommand.Flags().String(arg, "", "base config for agent service: "+arg)
 	}
 
-	agentCommand.AddCommand(agentStartCommand)
-	agentCommand.AddCommand(agentRestartCommand)
-	agentCommand.AddCommand(agentStateCommand)
-	agentCommand.AddCommand(agentStopCommand)
+	agentCommand.AddCommand(startCommand)
+	agentCommand.AddCommand(restartCommand)
+	agentCommand.AddCommand(stateCommand)
+	agentCommand.AddCommand(stopCommand)
 	return agentCommand
 }
 
-var agentCommand = &cobra.Command{
-	Use:   "agent",
-	Short: "agent 相关的命令",
-	RunE: func(c *cobra.Command, args []string) error {
-		if len(args) == 0 {
-			return c.Help()
+func newAgentRootCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "agent",
+		Short: "agent 相关的命令",
+		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return c.Help()
+			}
+			return nil
+		},
+	}
+}
+
+func buildDaemonArgs(executable string, options *agentOptions) []string {
+	args := []string{filepath.Base(executable), "agent", "start", "--daemon=true"}
+	if options.address != "" {
+		args = append(args, "--address", options.address)
+	}
+	for _, name := range agentStartArgs {
+		if value := *options.folderValues[name]; value != "" {
+			args = append(args, "--"+name, value)
 		}
-		return nil
-	},
+	}
+	return args
 }

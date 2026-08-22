@@ -2,39 +2,41 @@ package agent
 
 import (
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
-	"strconv"
+	"time"
 
 	"github.com/gohade/hade/framework/cobra"
 	"github.com/gohade/hade/framework/contract"
-	"github.com/gohade/hade/framework/util"
 )
 
-var agentStopCommand = &cobra.Command{
-	Use:   "stop",
-	Short: "停止一个已经启动的 agent 服务",
-	RunE: func(c *cobra.Command, args []string) error {
-		appService := c.GetContainer().MustMake(contract.AppKey).(contract.App)
-		serverPidFile := filepath.Join(appService.RuntimeFolder(), "agent.pid")
+func agentStopWait(c *cobra.Command) time.Duration {
+	wait := 5 * time.Second
+	configService := c.GetContainer().MustMake(contract.ConfigKey).(contract.Config)
+	if configService.IsExist("agent.close_wait") {
+		wait = time.Duration(configService.GetInt("agent.close_wait")) * time.Second
+	}
+	return wait
+}
 
-		content, err := ioutil.ReadFile(serverPidFile)
-		if err != nil {
-			return err
-		}
-		if len(content) != 0 {
-			pid, err := strconv.Atoi(string(content))
+func newAgentStopCommand(deps agentDependencies) *cobra.Command {
+	return &cobra.Command{
+		Use:   "stop",
+		Short: "停止一个已经启动的 agent 服务",
+		RunE: func(c *cobra.Command, args []string) error {
+			appService := c.GetContainer().MustMake(contract.AppKey).(contract.App)
+			serverPidFile := filepath.Join(appService.RuntimeFolder(), "agent.pid")
+			pid, exists, err := readPIDFile(serverPidFile)
 			if err != nil {
 				return err
 			}
-			if err := util.KillProcess(pid); err != nil {
-				return err
+			if !exists {
+				return nil
 			}
-			if err := ioutil.WriteFile(serverPidFile, []byte{}, 0644); err != nil {
+			if err := stopAgentProcess(serverPidFile, deps.executable, deps.process, agentStopWait(c)); err != nil {
 				return err
 			}
 			fmt.Println("停止 agent 服务进程:", pid)
-		}
-		return nil
-	},
+			return nil
+		},
+	}
 }

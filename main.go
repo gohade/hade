@@ -4,6 +4,9 @@
 package main
 
 import (
+	"fmt"
+	"os"
+
 	agentapp "github.com/gohade/hade/app/agent"
 	"github.com/gohade/hade/app/console"
 	"github.com/gohade/hade/app/grpc"
@@ -27,6 +30,13 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	// 初始化服务容器
 	container := framework.NewHadeContainer()
 	// 绑定App服务提供者
@@ -35,13 +45,13 @@ func main() {
 	_ = container.Bind(&env.HadeEnvProvider{})
 	_ = container.Bind(&distributed.LocalDistributedProvider{})
 	if err := container.Bind(&config.HadeConfigProvider{}); err != nil {
-		panic(err)
+		return err
 	}
 	if err := container.Bind(&llmprovider.HadeLLMProvider{}); err != nil {
-		panic(err)
+		return err
 	}
 	if err := container.Bind(&agentprovider.HadeAgentProvider{}); err != nil {
-		panic(err)
+		return err
 	}
 	_ = container.Bind(&id.HadeIDProvider{})
 	_ = container.Bind(&trace.HadeTraceProvider{})
@@ -56,26 +66,26 @@ func main() {
 	kernelProvider := &kernel.HadeKernelProvider{}
 	httpEngine, err := http.NewHttpEngine(container)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	kernelProvider.HttpEngine = httpEngine
 
 	grpcEngine, err := grpc.NewGrpcEngine(container)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	kernelProvider.GrpcEngine = grpcEngine
 
 	agentEngine, err := agentapp.NewAgentEngine(container)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	kernelProvider.AgentEngine = agentEngine
 
 	if err := container.Bind(kernelProvider); err != nil {
-		panic(err)
+		return err
 	}
 
 	// 运行root命令
-	_ = console.RunCommand(container)
+	return console.RunCommand(container)
 }
