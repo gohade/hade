@@ -53,9 +53,9 @@ func InitAgentCommand() *cobra.Command {
 	deps := agentDependencies{
 		process: defaultProcessOperations(),
 	}
-	startCommand := newAgentStartCommand(options)
+	startCommand := newAgentStartCommand(options, deps)
 	stopCommand := newAgentStopCommand(deps)
-	restartCommand := newAgentRestartCommand(options, stopCommand, startCommand)
+	restartCommand := newAgentRestartCommand(options, deps)
 	stateCommand := newAgentStateCommand()
 	agentCommand := newAgentRootCommand()
 

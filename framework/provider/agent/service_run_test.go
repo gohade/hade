@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	llmp "github.com/gohade/hade/framework/provider/llm"
 	"github.com/gohade/hade/framework/contract"
+	llmp "github.com/gohade/hade/framework/provider/llm"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -24,6 +24,17 @@ func (c *cancelWaitLLM) Chat(ctx context.Context, req contract.ChatRequest) (con
 	return contract.ChatResponse{}, ctx.Err()
 }
 
+// toolCallResponse 构造一条只带工具调用的 LLM 响应。
+func toolCallResponse(id, name, arguments string) contract.ChatResponse {
+	return contract.ChatResponse{
+		Message: contract.Message{
+			Role:      "assistant",
+			ToolCalls: []contract.ToolCall{{ID: id, Name: name, Arguments: arguments}},
+		},
+		Finish: contract.FinishToolCalls,
+	}
+}
+
 func collect(ch <-chan contract.AgentEvent) []contract.AgentEvent {
 	var out []contract.AgentEvent
 	for e := range ch {
@@ -36,9 +47,12 @@ func TestRun_EchoReActThenFinal(t *testing.T) {
 	Convey("react echo", t, func() {
 		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
 			{
-				Message:   contract.Message{Role: "assistant", Content: "call echo"},
-				ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{"text":"hi"}`}},
-				Finish:    contract.FinishToolCalls,
+				Message: contract.Message{
+					Role:      "assistant",
+					Content:   "call echo",
+					ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{"text":"hi"}`}},
+				},
+				Finish: contract.FinishToolCalls,
 			},
 			{
 				Message: contract.Message{Role: "assistant", Content: "ok"},
@@ -74,9 +88,9 @@ func TestRun_EchoReActThenFinal(t *testing.T) {
 func TestRun_MaxIterations(t *testing.T) {
 	Convey("max iter", t, func() {
 		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
-			{ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{}`}}, Finish: contract.FinishToolCalls},
-			{ToolCalls: []contract.ToolCall{{ID: "c2", Name: "echo", Arguments: `{}`}}, Finish: contract.FinishToolCalls},
-			{ToolCalls: []contract.ToolCall{{ID: "c3", Name: "echo", Arguments: `{}`}}, Finish: contract.FinishToolCalls},
+			toolCallResponse("c1", "echo", `{}`),
+			toolCallResponse("c2", "echo", `{}`),
+			toolCallResponse("c3", "echo", `{}`),
 		}}
 		a := NewMemoryAgent(script, 2)
 		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(ctx context.Context, argsJSON string) (string, error) {
@@ -104,13 +118,13 @@ func TestRun_SessionBusy(t *testing.T) {
 	Convey("busy", t, func() {
 		a := NewMemoryAgent(&fakeLLM{}, 8)
 		id, _ := a.CreateSession(context.Background())
-		a.mu.RLock()
+		a.sessMu.RLock()
 		s := a.sess[id]
-		a.mu.RUnlock()
-		s.mu.Lock()
+		a.sessMu.RUnlock()
+		s.runMu.Lock()
 		ch := make(chan contract.AgentEvent, 2)
 		err := a.Run(context.Background(), id, "two", ch)
-		s.mu.Unlock()
+		s.runMu.Unlock()
 		So(err, ShouldEqual, contract.ErrSessionBusy)
 	})
 }
@@ -156,10 +170,7 @@ func TestRun_CanceledWhenLLMReturnsAfterCtxDone(t *testing.T) {
 func TestRun_ToolHandlerCanRegisterToolWithoutDeadlock(t *testing.T) {
 	Convey("tool reentrant register", t, func() {
 		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
-			{
-				ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{}`}},
-				Finish:    contract.FinishToolCalls,
-			},
+			toolCallResponse("c1", "echo", `{}`),
 			{
 				Message: contract.Message{Role: "assistant", Content: "done"},
 				Finish:  contract.FinishStop,

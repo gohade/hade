@@ -1,8 +1,11 @@
 package agent
 
 import (
+	"errors"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -78,6 +81,30 @@ func TestStartAgentServeReturnsListenerError(t *testing.T) {
 	err = startAgentServe(server, time.Second)
 	if err == nil {
 		t.Fatal("expected occupied address error")
+	}
+}
+
+func TestListenFailureDoesNotWriteReady(t *testing.T) {
+	readyFile := filepath.Join(t.TempDir(), "agent.ready")
+	_, err := listenAndMarkReady(readyFile, 42, ":9999", func(string, string) (net.Listener, error) {
+		return nil, errors.New("bind failed")
+	})
+	if err == nil {
+		t.Fatal("expected bind error")
+	}
+	if _, err := os.Stat(readyFile); !os.IsNotExist(err) {
+		t.Fatalf("ready file unexpectedly exists: %v", err)
+	}
+}
+
+func TestDaemonAuthorizationEnvironmentDoesNotMutateParent(t *testing.T) {
+	parent := []string{"A=1"}
+	child := daemonChildEnvironment(parent, 4)
+	if len(parent) != 1 || parent[0] != "A=1" {
+		t.Fatalf("parent env mutated: %#v", parent)
+	}
+	if got := child[len(child)-1]; got != agentDaemonAuthFDEnv+"=4" {
+		t.Fatalf("child auth fd = %q", got)
 	}
 }
 

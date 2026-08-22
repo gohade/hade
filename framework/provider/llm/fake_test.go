@@ -19,10 +19,13 @@ func TestScriptLLM_ReturnsScriptedToolCallThenStop(t *testing.T) {
 		}
 		script := &ScriptLLM{Responses: []contract.ChatResponse{
 			{
-				Message: contract.Message{Role: "assistant", Content: "need echo"},
-				ToolCalls: []contract.ToolCall{{
-					ID: "call_1", Name: "echo", Arguments: `{"text":"hi"}`,
-				}},
+				Message: contract.Message{
+					Role:    "assistant",
+					Content: "need echo",
+					ToolCalls: []contract.ToolCall{{
+						ID: "call_1", Name: "echo", Arguments: `{"text":"hi"}`,
+					}},
+				},
 				Finish: contract.FinishToolCalls,
 			},
 			{
@@ -34,7 +37,7 @@ func TestScriptLLM_ReturnsScriptedToolCallThenStop(t *testing.T) {
 		r1, err := svc.Chat(context.Background(), req1)
 		So(err, ShouldBeNil)
 		So(r1.Finish, ShouldEqual, contract.FinishToolCalls)
-		So(r1.ToolCalls[0].Name, ShouldEqual, "echo")
+		So(r1.Message.ToolCalls[0].Name, ShouldEqual, "echo")
 		r2, err := svc.Chat(context.Background(), req2)
 		So(err, ShouldBeNil)
 		So(r2.Finish, ShouldEqual, contract.FinishStop)

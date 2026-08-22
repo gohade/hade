@@ -115,19 +115,17 @@ func ParseOpenAIResponse(data []byte) (contract.ChatResponse, error) {
 	if choice.Message.Content != nil {
 		message.Content = *choice.Message.Content
 	}
-	toolCalls := make([]contract.ToolCall, 0, len(choice.Message.ToolCalls))
+	// Message.ToolCalls 是工具调用的唯一权威字段。
 	for _, call := range choice.Message.ToolCalls {
-		toolCalls = append(toolCalls, contract.ToolCall{
+		message.ToolCalls = append(message.ToolCalls, contract.ToolCall{
 			ID:        call.ID,
 			Name:      call.Function.Name,
 			Arguments: call.Function.Arguments,
 		})
 	}
-	message.ToolCalls = append([]contract.ToolCall(nil), toolCalls...)
 
 	return contract.ChatResponse{
-		Message:   message,
-		ToolCalls: toolCalls,
-		Finish:    choice.FinishReason,
+		Message: message,
+		Finish:  choice.FinishReason,
 	}, nil
 }

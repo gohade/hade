@@ -23,9 +23,11 @@ func TestAgentEngineSessionAndMessagesSSE(t *testing.T) {
 		container := framework.NewHadeContainer()
 		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
 			{
-				Message:   contract.Message{Content: "t1"},
-				ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{"text":"hi"}`}},
-				Finish:    contract.FinishToolCalls,
+				Message: contract.Message{
+					Content:   "t1",
+					ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{"text":"hi"}`}},
+				},
+				Finish: contract.FinishToolCalls,
 			},
 			{Message: contract.Message{Content: "bye"}, Finish: contract.FinishStop},
 		}}
@@ -82,8 +84,12 @@ func TestAgentEngineSessionAndMessagesSSE(t *testing.T) {
 		So(ids, ShouldResemble, []int{1, 2, 3, 4, 5, 6, 7})
 
 		So(data[0]["session_id"], ShouldEqual, created.ID)
+		So(data[1]["content"], ShouldEqual, "t1")
 		So(data[2]["name"], ShouldEqual, "echo")
 		So(data[2]["arguments"], ShouldResemble, map[string]interface{}{"text": "hi"})
+		So(data[3]["name"], ShouldEqual, "echo")
+		So(data[3]["content"], ShouldEqual, "hi")
+		So(data[4]["content"], ShouldEqual, "bye")
 		So(data[5]["content"], ShouldEqual, "bye")
 		So(data[6], ShouldResemble, map[string]interface{}{})
 	})

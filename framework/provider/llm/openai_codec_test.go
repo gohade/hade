@@ -140,14 +140,15 @@ func TestCodecParseOpenAIResponse(t *testing.T) {
 			if got.Finish != tt.wantFinish || got.Message.Content != tt.wantContent {
 				t.Fatalf("response = %#v", got)
 			}
-			if len(got.ToolCalls) != tt.wantCalls || len(got.Message.ToolCalls) != tt.wantCalls {
-				t.Fatalf("tool call counts = top:%d message:%d", len(got.ToolCalls), len(got.Message.ToolCalls))
+			// Message.ToolCalls 是唯一权威字段，不存在并列的顶层字段。
+			if len(got.Message.ToolCalls) != tt.wantCalls {
+				t.Fatalf("tool call count = %d, want %d", len(got.Message.ToolCalls), tt.wantCalls)
 			}
 			if tt.wantCalls == 1 {
-				if got.ToolCalls[0].ID != "c1" ||
-					got.ToolCalls[0].Name != "echo" ||
-					got.ToolCalls[0].Arguments != `{"text":"hi"}` {
-					t.Fatalf("tool call = %#v", got.ToolCalls[0])
+				if got.Message.ToolCalls[0].ID != "c1" ||
+					got.Message.ToolCalls[0].Name != "echo" ||
+					got.Message.ToolCalls[0].Arguments != `{"text":"hi"}` {
+					t.Fatalf("tool call = %#v", got.Message.ToolCalls[0])
 				}
 			}
 		})
