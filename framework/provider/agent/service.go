@@ -142,6 +142,9 @@ func (a *MemoryAgent) Run(ctx context.Context, sessionID, userMessage string, ev
 			Tools:    tools,
 		})
 		if err != nil {
+			if ctx.Err() != nil {
+				return emitCanceled()
+			}
 			if !send(contract.EventError, map[string]interface{}{
 				"code":    "llm_failed",
 				"message": err.Error(),
@@ -205,14 +208,19 @@ func (a *MemoryAgent) Run(ctx context.Context, sessionID, userMessage string, ev
 }
 
 func (a *MemoryAgent) execTool(ctx context.Context, name, argsJSON string) (string, error) {
+	var handler contract.ToolHandler
 	a.mu.RLock()
-	defer a.mu.RUnlock()
 	for _, t := range a.tools {
 		if t.spec.Name == name {
-			return t.handler(ctx, argsJSON)
+			handler = t.handler
+			break
 		}
 	}
-	return "", errors.New("unknown tool: " + name)
+	a.mu.RUnlock()
+	if handler == nil {
+		return "", errors.New("unknown tool: " + name)
+	}
+	return handler(ctx, argsJSON)
 }
 
 func truncate(s string, n int) string {

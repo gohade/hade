@@ -3,11 +3,19 @@ package agent
 import (
 	"context"
 	"testing"
+	"time"
 
 	llmp "github.com/gohade/hade/framework/provider/llm"
 	"github.com/gohade/hade/framework/contract"
 	. "github.com/smartystreets/goconvey/convey"
 )
+
+type cancelWaitLLM struct{}
+
+func (c *cancelWaitLLM) Chat(ctx context.Context, req contract.ChatRequest) (contract.ChatResponse, error) {
+	<-ctx.Done()
+	return contract.ChatResponse{}, ctx.Err()
+}
 
 func collect(ch <-chan contract.AgentEvent) []contract.AgentEvent {
 	var out []contract.AgentEvent
@@ -97,6 +105,97 @@ func TestRun_SessionBusy(t *testing.T) {
 		err := a.Run(context.Background(), id, "two", ch)
 		s.mu.Unlock()
 		So(err, ShouldEqual, contract.ErrSessionBusy)
+	})
+}
+
+func TestRun_CanceledWhenLLMReturnsAfterCtxDone(t *testing.T) {
+	Convey("canceled not llm_failed", t, func() {
+		a := NewMemoryAgent(&cancelWaitLLM{}, 8)
+		id, _ := a.CreateSession(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
+		ch := make(chan contract.AgentEvent, 8)
+		var runErr error
+		go func() {
+			runErr = a.Run(ctx, id, "cancel me", ch)
+			close(ch)
+		}()
+		time.Sleep(20 * time.Millisecond)
+		cancel()
+		evs := collect(ch)
+		So(runErr, ShouldEqual, contract.ErrCanceled)
+		for _, e := range evs {
+			if e.Type == contract.EventError {
+				So(e.Data["code"], ShouldNotEqual, "llm_failed")
+			}
+		}
+		last := evs[len(evs)-1]
+		So(last.Type, ShouldEqual, contract.EventError)
+		So(last.Data["code"], ShouldEqual, "canceled")
+	})
+}
+
+func TestRun_ToolHandlerCanRegisterToolWithoutDeadlock(t *testing.T) {
+	Convey("tool reentrant register", t, func() {
+		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
+			{
+				ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{}`}},
+				Finish:    contract.FinishToolCalls,
+			},
+			{
+				Message: contract.Message{Role: "assistant", Content: "done"},
+				Finish:  contract.FinishStop,
+			},
+		}}
+		a := NewMemoryAgent(script, 8)
+		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(ctx context.Context, argsJSON string) (string, error) {
+			a.RegisterTool(contract.ToolSpec{Name: "nested"}, func(ctx context.Context, argsJSON string) (string, error) {
+				return "nested", nil
+			})
+			return "ok", nil
+		})
+		id, _ := a.CreateSession(context.Background())
+		ch := make(chan contract.AgentEvent, 16)
+		done := make(chan error, 1)
+		go func() {
+			done <- a.Run(context.Background(), id, "go", ch)
+			close(ch)
+		}()
+		var runErr error
+		select {
+		case runErr = <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Run deadlocked when tool handler called RegisterTool")
+		}
+		So(runErr, ShouldBeNil)
+		evs := collect(ch)
+		hasFinal := false
+		for _, e := range evs {
+			if e.Type == contract.EventFinal {
+				hasFinal = true
+			}
+		}
+		So(hasFinal, ShouldBeTrue)
+	})
+}
+
+func TestRun_EmptyMessageNoEvents(t *testing.T) {
+	Convey("empty message", t, func() {
+		a := NewMemoryAgent(&fakeLLM{}, 8)
+		id, _ := a.CreateSession(context.Background())
+		ch := make(chan contract.AgentEvent, 4)
+		err := a.Run(context.Background(), id, "  ", ch)
+		So(err, ShouldEqual, contract.ErrEmptyMessage)
+		So(len(ch), ShouldEqual, 0)
+	})
+}
+
+func TestRun_SessionNotFoundNoEvents(t *testing.T) {
+	Convey("session not found", t, func() {
+		a := NewMemoryAgent(&fakeLLM{}, 8)
+		ch := make(chan contract.AgentEvent, 4)
+		err := a.Run(context.Background(), "missing", "hi", ch)
+		So(err, ShouldEqual, contract.ErrSessionNotFound)
+		So(len(ch), ShouldEqual, 0)
 	})
 }
 
