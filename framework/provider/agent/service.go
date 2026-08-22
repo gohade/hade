@@ -2,12 +2,16 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/pkg/errors"
 )
+
+var _ contract.Agent = (*MemoryAgent)(nil)
 
 type memorySession struct {
 	data contract.Session
@@ -85,7 +89,130 @@ func (a *MemoryAgent) ListTools() []contract.ToolSpec {
 }
 
 func (a *MemoryAgent) Run(ctx context.Context, sessionID, userMessage string, events chan<- contract.AgentEvent) error {
-	return errors.New("not implemented")
+	if strings.TrimSpace(userMessage) == "" {
+		return contract.ErrEmptyMessage
+	}
+	a.mu.RLock()
+	s, ok := a.sess[sessionID]
+	a.mu.RUnlock()
+	if !ok {
+		return contract.ErrSessionNotFound
+	}
+	if !s.mu.TryLock() {
+		return contract.ErrSessionBusy
+	}
+	defer s.mu.Unlock()
+
+	send := func(typ string, data map[string]interface{}) bool {
+		if events == nil {
+			return true
+		}
+		select {
+		case events <- contract.AgentEvent{Type: typ, Data: data}:
+			return true
+		case <-ctx.Done():
+			return false
+		}
+	}
+	emitCanceled := func() error {
+		send(contract.EventError, map[string]interface{}{
+			"code":    "canceled",
+			"message": ctx.Err().Error(),
+		})
+		return contract.ErrCanceled
+	}
+
+	if !send(contract.EventSession, map[string]interface{}{"session_id": sessionID}) {
+		return emitCanceled()
+	}
+
+	s.data.Messages = append(s.data.Messages, contract.Message{Role: "user", Content: userMessage})
+
+	emitTrunc := func(typ, key, val string) bool {
+		return send(typ, map[string]interface{}{key: truncate(val, contract.ContentMaxBytes)})
+	}
+
+	for i := 0; i < a.maxIter; i++ {
+		if err := ctx.Err(); err != nil {
+			return emitCanceled()
+		}
+		tools := a.ListTools()
+		resp, err := a.llm.Chat(ctx, contract.ChatRequest{
+			Messages: append([]contract.Message(nil), s.data.Messages...),
+			Tools:    tools,
+		})
+		if err != nil {
+			if !send(contract.EventError, map[string]interface{}{
+				"code":    "llm_failed",
+				"message": err.Error(),
+			}) {
+				return emitCanceled()
+			}
+			return contract.ErrLLMFailed
+		}
+		if !emitTrunc(contract.EventThought, "content", resp.Message.Content) {
+			return emitCanceled()
+		}
+
+		if len(resp.ToolCalls) > 0 {
+			asst := contract.Message{Role: "assistant", Content: resp.Message.Content, ToolCalls: resp.ToolCalls}
+			s.data.Messages = append(s.data.Messages, asst)
+			for _, tc := range resp.ToolCalls {
+				argsMap := map[string]interface{}{}
+				argsValid := json.Unmarshal([]byte(tc.Arguments), &argsMap) == nil
+				if !argsValid {
+					argsMap = map[string]interface{}{}
+				}
+				if !send(contract.EventAction, map[string]interface{}{
+					"name":      tc.Name,
+					"arguments": argsMap,
+				}) {
+					return emitCanceled()
+				}
+				obs, herr := a.execTool(ctx, tc.Name, tc.Arguments)
+				if herr != nil {
+					obs = herr.Error()
+				}
+				obs = truncate(obs, contract.ContentMaxBytes)
+				if !argsValid {
+					obs = truncate("invalid tool arguments: "+tc.Arguments+" ; "+obs, contract.ContentMaxBytes)
+				}
+				if !send(contract.EventObservation, map[string]interface{}{
+					"name":    tc.Name,
+					"content": obs,
+				}) {
+					return emitCanceled()
+				}
+				s.data.Messages = append(s.data.Messages, contract.Message{
+					Role: "tool", Content: obs, ToolCallID: tc.ID,
+				})
+			}
+			continue
+		}
+		s.data.Messages = append(s.data.Messages, contract.Message{Role: "assistant", Content: resp.Message.Content})
+		if !emitTrunc(contract.EventFinal, "content", resp.Message.Content) {
+			return emitCanceled()
+		}
+		return nil
+	}
+	if !send(contract.EventError, map[string]interface{}{
+		"code":    "max_iterations",
+		"message": "max iterations reached",
+	}) {
+		return emitCanceled()
+	}
+	return contract.ErrMaxIterations
+}
+
+func (a *MemoryAgent) execTool(ctx context.Context, name, argsJSON string) (string, error) {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	for _, t := range a.tools {
+		if t.spec.Name == name {
+			return t.handler(ctx, argsJSON)
+		}
+	}
+	return "", errors.New("unknown tool: " + name)
 }
 
 func truncate(s string, n int) string {
