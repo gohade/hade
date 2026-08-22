@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var _ contract.LLM = (*ScriptLLM)(nil)
+
 type ScriptLLM struct {
 	mu        sync.Mutex
 	Responses []contract.ChatResponse
