@@ -4,10 +4,12 @@
 package main
 
 import (
+	agentapp "github.com/gohade/hade/app/agent"
 	"github.com/gohade/hade/app/console"
 	"github.com/gohade/hade/app/grpc"
 	"github.com/gohade/hade/app/http"
 	"github.com/gohade/hade/framework"
+	agentprovider "github.com/gohade/hade/framework/provider/agent"
 	"github.com/gohade/hade/framework/provider/app"
 	"github.com/gohade/hade/framework/provider/cache"
 	"github.com/gohade/hade/framework/provider/config"
@@ -15,6 +17,7 @@ import (
 	"github.com/gohade/hade/framework/provider/env"
 	"github.com/gohade/hade/framework/provider/id"
 	"github.com/gohade/hade/framework/provider/kernel"
+	llmprovider "github.com/gohade/hade/framework/provider/llm"
 	"github.com/gohade/hade/framework/provider/log"
 	"github.com/gohade/hade/framework/provider/orm"
 	"github.com/gohade/hade/framework/provider/redis"
@@ -31,7 +34,15 @@ func main() {
 	// 后续初始化需要绑定的服务提供者...
 	_ = container.Bind(&env.HadeEnvProvider{})
 	_ = container.Bind(&distributed.LocalDistributedProvider{})
-	_ = container.Bind(&config.HadeConfigProvider{})
+	if err := container.Bind(&config.HadeConfigProvider{}); err != nil {
+		panic(err)
+	}
+	if err := container.Bind(&llmprovider.HadeLLMProvider{}); err != nil {
+		panic(err)
+	}
+	if err := container.Bind(&agentprovider.HadeAgentProvider{}); err != nil {
+		panic(err)
+	}
 	_ = container.Bind(&id.HadeIDProvider{})
 	_ = container.Bind(&trace.HadeTraceProvider{})
 	_ = container.Bind(&log.HadeLogServiceProvider{})
@@ -43,14 +54,27 @@ func main() {
 
 	// 将HTTP和grpc引擎初始化,并且作为服务提供者绑定到服务容器中
 	kernelProvider := &kernel.HadeKernelProvider{}
-	if engine, err := http.NewHttpEngine(container); err == nil {
-		kernelProvider.HttpEngine = engine
+	httpEngine, err := http.NewHttpEngine(container)
+	if err != nil {
+		panic(err)
 	}
+	kernelProvider.HttpEngine = httpEngine
 
-	if engine, err := grpc.NewGrpcEngine(container); err == nil {
-		kernelProvider.GrpcEngine = engine
+	grpcEngine, err := grpc.NewGrpcEngine(container)
+	if err != nil {
+		panic(err)
 	}
-	_ = container.Bind(kernelProvider)
+	kernelProvider.GrpcEngine = grpcEngine
+
+	agentEngine, err := agentapp.NewAgentEngine(container)
+	if err != nil {
+		panic(err)
+	}
+	kernelProvider.AgentEngine = agentEngine
+
+	if err := container.Bind(kernelProvider); err != nil {
+		panic(err)
+	}
 
 	// 运行root命令
 	_ = console.RunCommand(container)
