@@ -10,9 +10,16 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-type cancelWaitLLM struct{}
+type cancelWaitLLM struct {
+	entered chan struct{}
+}
+
+func newCancelWaitLLM() *cancelWaitLLM {
+	return &cancelWaitLLM{entered: make(chan struct{})}
+}
 
 func (c *cancelWaitLLM) Chat(ctx context.Context, req contract.ChatRequest) (contract.ChatResponse, error) {
+	close(c.entered)
 	<-ctx.Done()
 	return contract.ChatResponse{}, ctx.Err()
 }
@@ -110,17 +117,29 @@ func TestRun_SessionBusy(t *testing.T) {
 
 func TestRun_CanceledWhenLLMReturnsAfterCtxDone(t *testing.T) {
 	Convey("canceled not llm_failed", t, func() {
-		a := NewMemoryAgent(&cancelWaitLLM{}, 8)
+		llm := newCancelWaitLLM()
+		a := NewMemoryAgent(llm, 8)
 		id, _ := a.CreateSession(context.Background())
 		ctx, cancel := context.WithCancel(context.Background())
 		ch := make(chan contract.AgentEvent, 8)
+		done := make(chan struct{})
 		var runErr error
 		go func() {
 			runErr = a.Run(ctx, id, "cancel me", ch)
 			close(ch)
+			close(done)
 		}()
-		time.Sleep(20 * time.Millisecond)
+		select {
+		case <-llm.entered:
+		case <-time.After(2 * time.Second):
+			t.Fatal("LLM Chat never entered")
+		}
 		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("Run did not finish after cancel")
+		}
 		evs := collect(ch)
 		So(runErr, ShouldEqual, contract.ErrCanceled)
 		for _, e := range evs {

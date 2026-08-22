@@ -115,10 +115,18 @@ func (a *MemoryAgent) Run(ctx context.Context, sessionID, userMessage string, ev
 		}
 	}
 	emitCanceled := func() error {
-		send(contract.EventError, map[string]interface{}{
-			"code":    "canceled",
-			"message": ctx.Err().Error(),
-		})
+		if events != nil {
+			select {
+			case events <- contract.AgentEvent{
+				Type: contract.EventError,
+				Data: map[string]interface{}{
+					"code":    "canceled",
+					"message": ctx.Err().Error(),
+				},
+			}:
+			default:
+			}
+		}
 		return contract.ErrCanceled
 	}
 
