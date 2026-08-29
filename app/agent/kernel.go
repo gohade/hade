@@ -56,7 +56,7 @@ func (r *agentResolver) resolve(c *gin.Context) (contract.Agent, error) {
 		r.agent = agent
 	}
 	if !r.toolsReady {
-		if err := registerExampleToolsSafely(r.agent); err != nil {
+		if err := registerExampleToolsSafely(r.agent, c); err != nil {
 			logDiagnostic("register example tools: %v", err)
 			return nil, errAgentUnavailable
 		}
@@ -88,14 +88,21 @@ func makeAgent(c *gin.Context) (agent contract.Agent, err error) {
 	return typed, nil
 }
 
+// serviceLookup 用于判断是否绑定 ORM，以及把 MustMake 传给工具 Handler。
+// *framework.HadeContainer 与 *gin.Context 均满足。
+type serviceLookup interface {
+	IsBind(key string) bool
+	MustMake(key string) interface{}
+}
+
 // registerExampleToolsSafely 注册示例工具，并把第三方 RegisterTool 的 panic 转成 error。
-func registerExampleToolsSafely(agent contract.Agent) (err error) {
+func registerExampleToolsSafely(agent contract.Agent, lookup serviceLookup) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("register tool panicked: %v\n%s", recovered, debug.Stack())
 		}
 	}()
-	RegisterExampleTools(agent)
+	RegisterExampleTools(agent, lookup)
 	return nil
 }
 
@@ -104,8 +111,9 @@ func logDiagnostic(format string, args ...interface{}) {
 	_, _ = fmt.Fprintf(os.Stderr, "[agent] "+format+"\n", args...)
 }
 
-// RegisterExampleTools 注册无外部副作用的示例工具。同名工具已存在时跳过。
-func RegisterExampleTools(agent contract.Agent) {
+// RegisterExampleTools 注册示例工具。同名工具已存在时跳过。
+// lookup 未绑定 hade:orm 时不注册 User 三工具。
+func RegisterExampleTools(agent contract.Agent, lookup serviceLookup) {
 	if agent == nil {
 		return
 	}
@@ -135,5 +143,48 @@ func RegisterExampleTools(agent contract.Agent) {
 				"properties": map[string]interface{}{},
 			},
 		}, tool.Time)
+	}
+	if lookup == nil || !lookup.IsBind(contract.ORMKey) {
+		return
+	}
+	if _, ok := registered["create_user"]; !ok {
+		agent.RegisterTool(contract.ToolSpec{
+			Name:        "create_user",
+			Description: "在数据库中创建用户，返回新记录的 id 与字段",
+			Parameters: map[string]interface{}{
+				"type":     "object",
+				"required": []string{"name"},
+				"properties": map[string]interface{}{
+					"name":  map[string]interface{}{"type": "string"},
+					"email": map[string]interface{}{"type": "string"},
+					"age":   map[string]interface{}{"type": "integer"},
+				},
+			},
+		}, tool.CreateUserHandler(lookup))
+	}
+	if _, ok := registered["get_user"]; !ok {
+		agent.RegisterTool(contract.ToolSpec{
+			Name:        "get_user",
+			Description: "按主键 id 查询一个用户",
+			Parameters: map[string]interface{}{
+				"type":     "object",
+				"required": []string{"id"},
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{"type": "integer"},
+				},
+			},
+		}, tool.GetUserHandler(lookup))
+	}
+	if _, ok := registered["list_users"]; !ok {
+		agent.RegisterTool(contract.ToolSpec{
+			Name:        "list_users",
+			Description: "列出用户，最多 20 条；可选按 name 模糊匹配",
+			Parameters: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"name": map[string]interface{}{"type": "string"},
+				},
+			},
+		}, tool.ListUsersHandler(lookup))
 	}
 }

@@ -48,6 +48,7 @@ export default {
                         "deploy",
                         "util",
                         "grpc",
+                        "agent",
                         "todo",
                     ],
                 },
