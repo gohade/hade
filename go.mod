@@ -1,6 +1,6 @@
 module github.com/gohade/hade
 
-go 1.18
+go 1.25
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
