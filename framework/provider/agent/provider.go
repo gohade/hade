@@ -28,7 +28,21 @@ func (p *HadeAgentProvider) Params(c framework.Container) []interface{} {
 		}
 		limits = limitsFromConfig(cfg)
 	}
-	return []interface{}{llm, maxIter, limits}
+	var logger contract.Log
+	if c.IsBind(contract.LogKey) {
+		logger = c.MustMake(contract.LogKey).(contract.Log)
+	}
+	var store interface{}
+	if c.IsBind(contract.RedisKey) {
+		redisService := c.MustMake(contract.RedisKey).(contract.RedisService)
+		client, err := redisService.GetClient()
+		if err != nil {
+			store = err
+		} else {
+			store = newRedisStore(client, limits.MaxSessions)
+		}
+	}
+	return []interface{}{llm, maxIter, limits, logger, store}
 }
 
 // limitsFromConfig 从 agent.yaml 读取有界资源上限。

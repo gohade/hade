@@ -2,12 +2,14 @@ package agent
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"sync"
 
 	"github.com/gohade/hade/app/agent/tool"
 	"github.com/gohade/hade/framework"
+	"github.com/gohade/hade/framework/agenthttp"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/gin"
 	"github.com/pkg/errors"
@@ -26,8 +28,8 @@ func NewAgentEngine(container framework.Container) (*gin.Engine, error) {
 	engine := gin.New()
 	engine.SetContainer(container)
 	engine.Use(gin.Recovery())
-
-	Routes(engine)
+	engine.Use((&agentResolver{}).Middleware)
+	agenthttp.Mount(engine)
 	return engine, nil
 }
 
@@ -63,6 +65,16 @@ func (r *agentResolver) resolve(c *gin.Context) (contract.Agent, error) {
 		r.toolsReady = true
 	}
 	return r.agent, nil
+}
+
+// Middleware 在处理协议之前惰性取出 Agent 并注册业务工具。失败时 500 JSON，可重试。
+func (r *agentResolver) Middleware(c *gin.Context) {
+	if _, err := r.resolve(c); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errAgentUnavailable.Error()})
+		c.Abort()
+		return
+	}
+	c.Next()
 }
 
 // makeAgent 从容器解析 Agent 实例。

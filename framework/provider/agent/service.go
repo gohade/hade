@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 	"runtime/debug"
 	"strings"
 	"sync"
 
 	"github.com/gohade/hade/framework/contract"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 )
 
@@ -56,20 +53,24 @@ type registeredTool struct {
 }
 
 type MemoryAgent struct {
-	llm     contract.LLM
+	// llm 是本 Agent 的模型后端，只负责带工具的一轮 Chat，不感知 session。
+	llm contract.LLM
+	// maxIter 是单次 Run 内 ReAct 循环的最大轮数，超出后返回 ErrMaxIterations。
 	maxIter int
-	limits  Limits
+	// limits 是 Session 数量、单条消息和历史体积的硬上限。
+	limits Limits
 
-	// diagnostics 承接被 recover 的 panic 详情。默认 os.Stderr；
-	// 之所以不走 contract.Log，是为了避免 Provider 层的循环依赖，
-	// 也让 Agent 在没有容器的场景（单测、库直用）里同样能留下现场。
-	diagnostics io.Writer
+	// logger 承接被 recover 的 panic 详情（Error，带 session/value/stack）。
+	// 只依赖 contract.Log，不依赖具体日志实现；未注入时静默跳过。
+	logger contract.Log
 
-	sessMu sync.RWMutex
-	sess   map[string]*memorySession
+	// store 持久化 Session 历史并提供 Run 互斥。默认内存；可注入 Redis。
+	store SessionStore
 
+	// toolsMu 保护 tools 的注册、覆盖与列表拷贝，允许与 Run 并发。
 	toolsMu sync.RWMutex
-	tools   []registeredTool
+	// tools 是已注册工具表；同名后写覆盖，ListTools 返回拷贝。
+	tools []registeredTool
 }
 
 // NewMemoryAgent 使用默认有界资源上限创建内存 Agent。
@@ -83,17 +84,17 @@ func NewMemoryAgentWithLimits(llm contract.LLM, maxIter int, limits Limits) *Mem
 	if maxIter <= 0 {
 		maxIter = contract.DefaultMaxIter
 	}
+	limits = limits.normalize()
 	return &MemoryAgent{
-		llm:         llm,
-		maxIter:     maxIter,
-		limits:      limits.normalize(),
-		diagnostics: os.Stderr,
-		sess:        map[string]*memorySession{},
+		llm:     llm,
+		maxIter: maxIter,
+		limits:  limits,
+		store:   newMemoryStore(limits.MaxSessions),
 	}
 }
 
 // NewHadeAgentService 从 Provider 参数创建 Agent。
-// 第三个参数（Limits）可选，缺省时使用默认上限，保持对旧调用的兼容。
+// 第三、四、五个参数（Limits、contract.Log、SessionStore 或 GetClient error）均可选。
 func NewHadeAgentService(params ...interface{}) (interface{}, error) {
 	llm := params[0].(contract.LLM)
 	maxIter := params[1].(int)
@@ -103,45 +104,53 @@ func NewHadeAgentService(params ...interface{}) (interface{}, error) {
 			limits = configured
 		}
 	}
-	return NewMemoryAgentWithLimits(llm, maxIter, limits), nil
+	agent := NewMemoryAgentWithLimits(llm, maxIter, limits)
+	if len(params) > 3 {
+		if logger, ok := params[3].(contract.Log); ok {
+			agent.logger = logger
+		}
+	}
+	if len(params) > 4 && params[4] != nil {
+		if err, ok := params[4].(error); ok {
+			return nil, err
+		}
+		if store, ok := params[4].(SessionStore); ok {
+			agent.store = store
+		}
+	}
+	return agent, nil
 }
 
-// logDiagnostic 记录内部故障现场。写失败被忽略：诊断输出不能影响主流程。
-func (a *MemoryAgent) logDiagnostic(format string, args ...interface{}) {
-	writer := a.diagnostics
-	if writer == nil {
-		writer = os.Stderr
+// logRunPanic 把 recover 现场写进 contract.Log。日志实现 panic 时被吞掉，不影响主流程。
+func (a *MemoryAgent) logRunPanic(ctx context.Context, sessionID string, recovered interface{}) {
+	if a.logger == nil {
+		return
 	}
-	_, _ = fmt.Fprintf(writer, format, args...)
+	defer func() { _ = recover() }()
+	a.logger.Error(ctx, "agent run panic", map[string]interface{}{
+		"session": sessionID,
+		"value":   recovered,
+		"stack":   string(debug.Stack()),
+	})
 }
 
 func (a *MemoryAgent) CreateSession(ctx context.Context) (string, error) {
-	a.sessMu.Lock()
-	defer a.sessMu.Unlock()
-	if len(a.sess) >= a.limits.MaxSessions {
-		return "", contract.ErrSessionLimit
-	}
-	id := uuid.New().String()
-	a.sess[id] = newMemorySession(id)
-	return id, nil
+	return a.store.Create(ctx)
 }
 
-// GetSession 返回 Session 快照。只取 dataMu 的短临界区，不会被同 Session 正在运行的 Run 阻塞。
+// GetSession 返回 Session 快照。只读 store，不会被同 Session 正在运行的 Run 阻塞。
 func (a *MemoryAgent) GetSession(ctx context.Context, id string) (contract.Session, error) {
-	a.sessMu.RLock()
-	session, ok := a.sess[id]
-	a.sessMu.RUnlock()
-	if !ok {
-		return contract.Session{}, contract.ErrSessionNotFound
+	messages, err := a.store.Open(ctx, id)
+	if err != nil {
+		return contract.Session{}, err
 	}
-	messages := session.snapshot()
 	if messages == nil {
 		messages = []contract.Message{}
 	}
 	for i := range messages {
 		messages[i] = truncateMessageForRead(messages[i], contract.ContentMaxBytes)
 	}
-	return contract.Session{ID: session.id, Messages: messages}, nil
+	return contract.Session{ID: id, Messages: messages}, nil
 }
 
 // RegisterTool 注册工具。名称为空或 handler 为 nil 的注册被忽略；同名注册覆盖旧实现。
@@ -186,26 +195,21 @@ func (a *MemoryAgent) Run(
 	if len(userMessage) > a.limits.MaxMessageBytes {
 		return contract.ErrMessageTooLarge
 	}
-	a.sessMu.RLock()
-	session, ok := a.sess[sessionID]
-	a.sessMu.RUnlock()
-	if !ok {
-		return contract.ErrSessionNotFound
+	session, err := a.store.TryBeginRun(ctx, sessionID)
+	if err != nil {
+		return err
 	}
-	if !session.runMu.TryLock() {
-		return contract.ErrSessionBusy
-	}
-	defer session.runMu.Unlock()
+	defer session.Release()
 
 	run := &runState{agent: a, session: session, events: events, ctx: ctx}
+	run.settleDanglingToolCalls()
 	defer func() {
 		recovered := recover()
 		if recovered == nil {
 			return
 		}
-		// 现场只进诊断输出，不进事件流：客户端拿不到 panic 细节。
-		a.logDiagnostic("[agent] run panic: session=%s value=%v\n%s\n",
-			sessionID, recovered, debug.Stack())
+		// 现场只进日志，不进事件流：客户端拿不到 panic 细节。
+		a.logRunPanic(ctx, sessionID, recovered)
 		// 自身逻辑异常也不能留下悬空的 assistant.tool_calls。
 		run.settlePending(settleReasonInternal)
 		run.tryEmit(contract.EventError, map[string]interface{}{
@@ -250,7 +254,7 @@ func (a *MemoryAgent) lookupTool(name string) contract.ToolHandler {
 // 任何提前退出路径都必须把 pending 补齐，否则下一轮送给 OpenAI 的历史非法。
 type runState struct {
 	agent   *MemoryAgent
-	session *memorySession
+	session RunSession
 	events  chan<- contract.AgentEvent
 	ctx     context.Context
 	pending []string
@@ -310,7 +314,7 @@ func (r *runState) settlePending(reason string) {
 		})
 	}
 	r.pending = nil
-	r.session.appendReserved(messages...)
+	r.session.AppendReserved(messages...)
 }
 
 func (r *runState) historyLimited() error {
@@ -323,9 +327,39 @@ func (r *runState) historyLimited() error {
 	return contract.ErrHistoryLimit
 }
 
+func (r *runState) settleDanglingToolCalls() {
+	pending := danglingToolCallIDs(r.session.Snapshot())
+	if len(pending) == 0 {
+		return
+	}
+	r.pending = pending
+	r.settlePending(settleReasonInternal)
+}
+
+func danglingToolCallIDs(messages []contract.Message) []string {
+	answered := map[string]struct{}{}
+	for _, message := range messages {
+		if message.Role == "tool" && message.ToolCallID != "" {
+			answered[message.ToolCallID] = struct{}{}
+		}
+	}
+	var pending []string
+	for _, message := range messages {
+		if message.Role != "assistant" {
+			continue
+		}
+		for _, call := range message.ToolCalls {
+			if _, ok := answered[call.ID]; !ok {
+				pending = append(pending, call.ID)
+			}
+		}
+	}
+	return pending
+}
+
 func (r *runState) loop(sessionID, userMessage string) error {
 	limit := r.agent.limits.MaxHistoryBytes
-	if err := r.session.appendWithin(limit, 0, contract.Message{
+	if err := r.session.AppendWithin(limit, 0, contract.Message{
 		Role:    "user",
 		Content: userMessage,
 	}); err != nil {
@@ -340,7 +374,7 @@ func (r *runState) loop(sessionID, userMessage string) error {
 			return r.canceled()
 		}
 		resp, err := r.agent.llm.Chat(r.ctx, contract.ChatRequest{
-			Messages: r.session.snapshot(),
+			Messages: r.session.Snapshot(),
 			Tools:    r.agent.ListTools(),
 		})
 		if err != nil {
@@ -368,7 +402,7 @@ func (r *runState) loop(sessionID, userMessage string) error {
 			continue
 		}
 
-		if err := r.session.appendWithin(limit, 0, contract.Message{
+		if err := r.session.AppendWithin(limit, 0, contract.Message{
 			Role:    "assistant",
 			Content: resp.Message.Content,
 		}); err != nil {
@@ -393,9 +427,9 @@ func (r *runState) loop(sessionID, userMessage string) error {
 
 func (r *runState) runToolCalls(thought string, calls []contract.ToolCall) error {
 	limit := r.agent.limits.MaxHistoryBytes
-	mark := r.session.length()
+	mark := r.session.Length()
 	assistant := contract.Message{Role: "assistant", Content: thought, ToolCalls: calls}
-	if err := r.session.appendWithin(limit, settleReserveBytes(calls), assistant); err != nil {
+	if err := r.session.AppendWithin(limit, settleReserveBytes(calls), assistant); err != nil {
 		// assistant 尚未入历史，直接拒绝即可，历史仍然合法。
 		return r.historyLimited()
 	}
@@ -431,9 +465,9 @@ func (r *runState) runToolCalls(thought string, calls []contract.ToolCall) error
 
 		// 真实结果先落历史再推事件：即使紧接着被取消，这个 call 也已经闭环。
 		result := contract.Message{Role: "tool", ToolCallID: call.ID, Content: observation}
-		if err := r.session.appendWithin(limit, settleReserveBytes(calls[index+1:]), result); err != nil {
+		if err := r.session.AppendWithin(limit, settleReserveBytes(calls[index+1:]), result); err != nil {
 			// 回滚整组 assistant.tool_calls，历史既不超限也不残留悬空 call。
-			r.session.truncateTo(mark)
+			r.session.TruncateTo(mark)
 			r.pending = nil
 			return r.historyLimited()
 		}

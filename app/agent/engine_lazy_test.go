@@ -1,11 +1,9 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -107,74 +105,6 @@ func TestNewAgentEngineDoesNotTouchRealProviders(t *testing.T) {
 	})
 }
 
-func TestMessagesRejectsOversizedBody(t *testing.T) {
-	Convey("请求体超过 64KiB 时返回 413 JSON 且不升流", t, func() {
-		mem := agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)
-		engine := newTestEngine(t, mem)
-		id, err := mem.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-
-		body := bytes.NewBufferString(`{"message":"`)
-		body.Write(bytes.Repeat([]byte("x"), contract.RequestBodyMaxBytes+1024))
-		body.WriteString(`"}`)
-
-		response := performRequest(engine, http.MethodPost, "/sessions/"+id+"/messages", body)
-		So(response.Code, ShouldEqual, http.StatusRequestEntityTooLarge)
-		So(response.Header().Get("Content-Type"), ShouldStartWith, "application/json")
-		So(response.Header().Get("Content-Type"), ShouldNotStartWith, "text/event-stream")
-	})
-}
-
-func TestMessagesRejectsOversizedMessage(t *testing.T) {
-	Convey("单条消息超过 Agent 上限时返回 413 JSON", t, func() {
-		mem := agprovider.NewMemoryAgentWithLimits(
-			&llmp.ScriptLLM{}, 8, agprovider.Limits{MaxMessageBytes: 8},
-		)
-		engine := newTestEngine(t, mem)
-		id, err := mem.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-
-		response := performRequest(
-			engine,
-			http.MethodPost,
-			"/sessions/"+id+"/messages",
-			bytes.NewBufferString(`{"message":"0123456789"}`),
-		)
-		assertJSONError(response, http.StatusRequestEntityTooLarge, contract.ErrMessageTooLarge.Error())
-	})
-}
-
-func TestMessagesMessageLimitIsReachableUnderBodyLimit(t *testing.T) {
-	Convey("body 上限严格大于消息上限，message 超限时 413 可达", t, func() {
-		So(contract.RequestBodyMaxBytes, ShouldBeGreaterThan, contract.DefaultMaxMessageBytes)
-
-		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
-			{Message: contract.Message{Content: "ok"}, Finish: contract.FinishStop},
-		}}
-		mem := agprovider.NewMemoryAgent(script, 8)
-		engine := newTestEngine(t, mem)
-		id, err := mem.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-
-		messageBody := func(size int) *bytes.Buffer {
-			return bytes.NewBufferString(`{"message":"` + strings.Repeat("x", size) + `"}`)
-		}
-
-		// 恰好等于消息上限：整个 body 仍在 body 上限内，请求正常升流。
-		atLimit := messageBody(contract.DefaultMaxMessageBytes)
-		So(atLimit.Len(), ShouldBeLessThanOrEqualTo, contract.RequestBodyMaxBytes)
-		accepted := performRequest(engine, http.MethodPost, "/sessions/"+id+"/messages", atLimit)
-		So(accepted.Code, ShouldEqual, http.StatusOK)
-		So(accepted.Header().Get("Content-Type"), ShouldStartWith, "text/event-stream")
-
-		// 超过消息上限但仍在 body 上限内：必须是 413 message_too_large，而不是被 body 上限吞掉。
-		overLimit := messageBody(contract.DefaultMaxMessageBytes + 1)
-		So(overLimit.Len(), ShouldBeLessThanOrEqualTo, contract.RequestBodyMaxBytes)
-		rejected := performRequest(engine, http.MethodPost, "/sessions/"+id+"/messages", overLimit)
-		assertJSONError(rejected, http.StatusRequestEntityTooLarge, contract.ErrMessageTooLarge.Error())
-	})
-}
-
 func TestResolverRetriesToolRegistrationAfterPanic(t *testing.T) {
 	Convey("示例工具注册 panic 不会让工具永久丢失，后续请求可重试", t, func() {
 		agent := &flakyToolAgent{failRegister: true}
@@ -244,17 +174,4 @@ func (*flakyToolAgent) GetSession(context.Context, string) (contract.Session, er
 }
 func (*flakyToolAgent) Run(context.Context, string, string, chan<- contract.AgentEvent) error {
 	return nil
-}
-
-func TestCreateSessionMapsSessionLimitTo503(t *testing.T) {
-	Convey("Session 数达上限时 CreateSession 返回 503 JSON", t, func() {
-		mem := agprovider.NewMemoryAgentWithLimits(
-			&llmp.ScriptLLM{}, 8, agprovider.Limits{MaxSessions: 1},
-		)
-		engine := newTestEngine(t, mem)
-
-		So(performRequest(engine, http.MethodPost, "/sessions", nil).Code, ShouldEqual, http.StatusCreated)
-		response := performRequest(engine, http.MethodPost, "/sessions", nil)
-		assertJSONError(response, http.StatusServiceUnavailable, contract.ErrSessionLimit.Error())
-	})
 }

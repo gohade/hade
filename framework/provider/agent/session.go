@@ -1,10 +1,12 @@
 package agent
 
 import (
+	"context"
 	"sync"
 	"unicode/utf8"
 
 	"github.com/gohade/hade/framework/contract"
+	"github.com/google/uuid"
 )
 
 // settleReasonMaxBytes 是补偿型 tool 消息 Content 的字节上限。
@@ -41,30 +43,34 @@ func newMemorySession(id string) *memorySession {
 	return &memorySession{id: id}
 }
 
-// snapshot 返回消息的深拷贝，调用方可以安全地长期持有与修改。
-func (s *memorySession) snapshot() []contract.Message {
+func (s *memorySession) ID() string { return s.id }
+
+func (s *memorySession) Release() { s.runMu.Unlock() }
+
+// Snapshot 返回消息的深拷贝，调用方可以安全地长期持有与修改。
+func (s *memorySession) Snapshot() []contract.Message {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
 	return cloneMessages(s.messages)
 }
 
-// length 返回当前消息条数，用于历史超限时回滚。
-func (s *memorySession) length() int {
+// Length 返回当前消息条数，用于历史超限时回滚。
+func (s *memorySession) Length() int {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
 	return len(s.messages)
 }
 
-// usedBytes 返回历史已占用的字节数。
-func (s *memorySession) usedBytes() int {
+// UsedBytes 返回历史已占用的字节数。
+func (s *memorySession) UsedBytes() int {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
 	return s.bytes
 }
 
-// appendWithin 在"已用字节 + 本次写入 + reserve 预留"不超过 limit 时追加消息。
+// AppendWithin 在"已用字节 + 本次写入 + reserve 预留"不超过 limit 时追加消息。
 // reserve 是尚未闭环的 tool_call 的补偿配额，先占住才能保证后续补偿一定写得下。
-func (s *memorySession) appendWithin(limit, reserve int, msgs ...contract.Message) error {
+func (s *memorySession) AppendWithin(limit, reserve int, msgs ...contract.Message) error {
 	added := 0
 	for _, message := range msgs {
 		added += messageBytes(message)
@@ -79,8 +85,8 @@ func (s *memorySession) appendWithin(limit, reserve int, msgs ...contract.Messag
 	return nil
 }
 
-// appendReserved 写入已被 appendWithin 预留过配额的补偿消息，因此不再判断上限。
-func (s *memorySession) appendReserved(msgs ...contract.Message) {
+// AppendReserved 写入已被 AppendWithin 预留过配额的补偿消息，因此不再判断上限。
+func (s *memorySession) AppendReserved(msgs ...contract.Message) {
 	added := 0
 	for _, message := range msgs {
 		added += messageBytes(message)
@@ -91,8 +97,8 @@ func (s *memorySession) appendReserved(msgs ...contract.Message) {
 	s.bytes += added
 }
 
-// truncateTo 回滚到指定条数，用于撤销一组未闭环的 assistant tool_calls 及其 tool 回复。
-func (s *memorySession) truncateTo(n int) {
+// TruncateTo 回滚到指定条数，用于撤销一组未闭环的 assistant tool_calls 及其 tool 回复。
+func (s *memorySession) TruncateTo(n int) {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
 	if n < 0 || n >= len(s.messages) {
@@ -105,6 +111,57 @@ func (s *memorySession) truncateTo(n int) {
 	if s.bytes < 0 {
 		s.bytes = 0
 	}
+}
+
+type memoryStore struct {
+	mu          sync.RWMutex
+	sess        map[string]*memorySession
+	maxSessions int
+}
+
+func newMemoryStore(maxSessions int) SessionStore {
+	if maxSessions <= 0 {
+		maxSessions = DefaultLimits().MaxSessions
+	}
+	return &memoryStore{sess: map[string]*memorySession{}, maxSessions: maxSessions}
+}
+
+func (m *memoryStore) Create(ctx context.Context) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.sess) >= m.maxSessions {
+		return "", contract.ErrSessionLimit
+	}
+	id := uuid.New().String()
+	m.sess[id] = newMemorySession(id)
+	return id, nil
+}
+
+func (m *memoryStore) Open(ctx context.Context, id string) ([]contract.Message, error) {
+	m.mu.RLock()
+	session, ok := m.sess[id]
+	m.mu.RUnlock()
+	if !ok {
+		return nil, contract.ErrSessionNotFound
+	}
+	messages := session.Snapshot()
+	if messages == nil {
+		messages = []contract.Message{}
+	}
+	return messages, nil
+}
+
+func (m *memoryStore) TryBeginRun(ctx context.Context, id string) (RunSession, error) {
+	m.mu.RLock()
+	session, ok := m.sess[id]
+	m.mu.RUnlock()
+	if !ok {
+		return nil, contract.ErrSessionNotFound
+	}
+	if !session.runMu.TryLock() {
+		return nil, contract.ErrSessionBusy
+	}
+	return session, nil
 }
 
 func cloneMessages(in []contract.Message) []contract.Message {
