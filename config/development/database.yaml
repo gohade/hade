@@ -10,7 +10,7 @@ default:
     port: 3306 # 端口
     database: test # 数据库
     username: root # 用户名
-    password: "123456" # 密码
+    password: "" # 本机 Homebrew MySQL root 免密
     charset: utf8mb4 # 字符集
     collation: utf8mb4_unicode_ci # 字符序
     timeout: 10s # 连接超时
