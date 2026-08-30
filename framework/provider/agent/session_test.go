@@ -8,9 +8,9 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestMemoryStore_CreateOpenLimitBusy(t *testing.T) {
-	Convey("内存 store：创建、只读、上限、Busy", t, func() {
-		store := newMemoryStore(1)
+func TestMemoryStore_CreateOpenBusy(t *testing.T) {
+	Convey("内存 store：创建、只读、Busy", t, func() {
+		store := newMemoryStore()
 		ctx := context.Background()
 
 		id, err := store.Create(ctx)
@@ -20,7 +20,7 @@ func TestMemoryStore_CreateOpenLimitBusy(t *testing.T) {
 		So(msgs, ShouldBeEmpty)
 
 		_, err = store.Create(ctx)
-		So(err, ShouldEqual, contract.ErrSessionLimit)
+		So(err, ShouldBeNil)
 
 		_, err = store.Open(ctx, "missing")
 		So(err, ShouldEqual, contract.ErrSessionNotFound)
@@ -36,9 +36,9 @@ func TestMemoryStore_CreateOpenLimitBusy(t *testing.T) {
 	})
 }
 
-func TestMemoryStore_AppendQuotaAndTruncate(t *testing.T) {
-	Convey("内存 store：配额与 truncate", t, func() {
-		store := newMemoryStore(8)
+func TestMemoryStore_AppendAndTruncate(t *testing.T) {
+	Convey("内存 store：追加与 truncate", t, func() {
+		store := newMemoryStore()
 		ctx := context.Background()
 		id, err := store.Create(ctx)
 		So(err, ShouldBeNil)
@@ -46,11 +46,10 @@ func TestMemoryStore_AppendQuotaAndTruncate(t *testing.T) {
 		So(err, ShouldBeNil)
 		defer run.Release()
 
-		So(run.AppendWithin(10, 0, contract.Message{Role: "user", Content: "abcdefghijk"}), ShouldEqual, contract.ErrHistoryLimit)
-		So(run.AppendWithin(100, 0, contract.Message{Role: "user", Content: "hi"}), ShouldBeNil)
+		So(run.Append(contract.Message{Role: "user", Content: "hi"}), ShouldBeNil)
 		So(run.Length(), ShouldEqual, 1)
 		mark := run.Length()
-		So(run.AppendWithin(100, 0, contract.Message{Role: "assistant", Content: "there"}), ShouldBeNil)
+		So(run.Append(contract.Message{Role: "assistant", Content: "there"}), ShouldBeNil)
 		run.TruncateTo(mark)
 		So(run.Length(), ShouldEqual, 1)
 		So(run.Snapshot()[0].Content, ShouldEqual, "hi")

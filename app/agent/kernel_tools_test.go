@@ -21,7 +21,7 @@ func toolNames(agent contract.Agent) map[string]struct{} {
 func TestRegisterExampleTools_SkipsUserToolsWithoutORM(t *testing.T) {
 	Convey("未绑定 ORM 时只有 echo 和 time", t, func() {
 		container := framework.NewHadeContainer()
-		mem := agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)
+		mem := agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)
 		RegisterExampleTools(mem, container)
 		names := toolNames(mem)
 		So(names, ShouldContainKey, "echo")
@@ -46,7 +46,7 @@ func TestRegisterExampleTools_RegistersUserToolsWhenORMBound(t *testing.T) {
 	Convey("绑定 ORM 关键字后注册三个 User 工具", t, func() {
 		container := framework.NewHadeContainer()
 		So(container.Bind(&stubORMProvider{}), ShouldBeNil)
-		mem := agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)
+		mem := agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)
 		RegisterExampleTools(mem, container)
 		names := toolNames(mem)
 		So(names, ShouldContainKey, "create_user")

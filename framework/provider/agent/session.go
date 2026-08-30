@@ -9,8 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// settleReasonMaxBytes 是补偿型 tool 消息 Content 的字节上限。
-// 历史配额按这个值为每个未闭环的 tool_call 预留，保证补偿写入永不突破总上限。
+// settleReasonMaxBytes 是补偿型 tool 消息 Content 的字节上限，避免补偿文案过长。
 const settleReasonMaxBytes = 32
 
 const (
@@ -54,7 +53,7 @@ func (s *memorySession) Snapshot() []contract.Message {
 	return cloneMessages(s.messages)
 }
 
-// Length 返回当前消息条数，用于历史超限时回滚。
+// Length 返回当前消息条数，用于 TruncateTo 回滚。
 func (s *memorySession) Length() int {
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
@@ -68,33 +67,16 @@ func (s *memorySession) UsedBytes() int {
 	return s.bytes
 }
 
-// AppendWithin 在"已用字节 + 本次写入 + reserve 预留"不超过 limit 时追加消息。
-// reserve 是尚未闭环的 tool_call 的补偿配额，先占住才能保证后续补偿一定写得下。
-func (s *memorySession) AppendWithin(limit, reserve int, msgs ...contract.Message) error {
+func (s *memorySession) Append(msgs ...contract.Message) error {
 	added := 0
 	for _, message := range msgs {
 		added += messageBytes(message)
 	}
 	s.dataMu.Lock()
 	defer s.dataMu.Unlock()
-	if s.bytes+added+reserve > limit {
-		return contract.ErrHistoryLimit
-	}
 	s.messages = append(s.messages, cloneMessages(msgs)...)
 	s.bytes += added
 	return nil
-}
-
-// AppendReserved 写入已被 AppendWithin 预留过配额的补偿消息，因此不再判断上限。
-func (s *memorySession) AppendReserved(msgs ...contract.Message) {
-	added := 0
-	for _, message := range msgs {
-		added += messageBytes(message)
-	}
-	s.dataMu.Lock()
-	defer s.dataMu.Unlock()
-	s.messages = append(s.messages, cloneMessages(msgs)...)
-	s.bytes += added
 }
 
 // TruncateTo 回滚到指定条数，用于撤销一组未闭环的 assistant tool_calls 及其 tool 回复。
@@ -114,24 +96,17 @@ func (s *memorySession) TruncateTo(n int) {
 }
 
 type memoryStore struct {
-	mu          sync.RWMutex
-	sess        map[string]*memorySession
-	maxSessions int
+	mu   sync.RWMutex
+	sess map[string]*memorySession
 }
 
-func newMemoryStore(maxSessions int) SessionStore {
-	if maxSessions <= 0 {
-		maxSessions = DefaultLimits().MaxSessions
-	}
-	return &memoryStore{sess: map[string]*memorySession{}, maxSessions: maxSessions}
+func newMemoryStore() SessionStore {
+	return &memoryStore{sess: map[string]*memorySession{}}
 }
 
 func (m *memoryStore) Create(ctx context.Context) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if len(m.sess) >= m.maxSessions {
-		return "", contract.ErrSessionLimit
-	}
 	id := uuid.New().String()
 	m.sess[id] = newMemorySession(id)
 	return id, nil
@@ -183,15 +158,6 @@ func messageBytes(m contract.Message) int {
 	total := len(m.Role) + len(m.Content) + len(m.ToolCallID)
 	for _, call := range m.ToolCalls {
 		total += len(call.ID) + len(call.Name) + len(call.Arguments)
-	}
-	return total
-}
-
-// settleReserveBytes 返回一组 tool_call 全部走补偿路径时的最坏字节开销。
-func settleReserveBytes(calls []contract.ToolCall) int {
-	total := 0
-	for _, call := range calls {
-		total += len("tool") + len(call.ID) + settleReasonMaxBytes
 	}
 	return total
 }

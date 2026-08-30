@@ -48,39 +48,27 @@ type sessionDoc struct {
 }
 
 type redisStore struct {
-	client      *redis.Client
-	maxSessions int
-	lockTTL     time.Duration
-	renewEvery  time.Duration
+	client     *redis.Client
+	lockTTL    time.Duration
+	renewEvery time.Duration
 }
 
-func newRedisStore(client *redis.Client, maxSessions int) SessionStore {
-	return newRedisStoreWithLock(client, maxSessions, lockTTLDefault, renewDefault)
+func newRedisStore(client *redis.Client) SessionStore {
+	return newRedisStoreWithLock(client, lockTTLDefault, renewDefault)
 }
 
-func newRedisStoreWithLock(client *redis.Client, maxSessions int, lockTTL, renewEvery time.Duration) SessionStore {
-	if maxSessions <= 0 {
-		maxSessions = DefaultLimits().MaxSessions
-	}
+func newRedisStoreWithLock(client *redis.Client, lockTTL, renewEvery time.Duration) SessionStore {
 	if lockTTL <= 0 {
 		lockTTL = lockTTLDefault
 	}
 	return &redisStore{
-		client:      client,
-		maxSessions: maxSessions,
-		lockTTL:     lockTTL,
-		renewEvery:  renewEvery,
+		client:     client,
+		lockTTL:    lockTTL,
+		renewEvery: renewEvery,
 	}
 }
 
 func (s *redisStore) Create(ctx context.Context) (string, error) {
-	n, err := s.client.SCard(ctx, sessionsSetKey).Result()
-	if err != nil {
-		return "", contract.ErrInternal
-	}
-	if int(n) >= s.maxSessions {
-		return "", contract.ErrSessionLimit
-	}
 	id := uuid.New().String()
 	payload, err := json.Marshal(sessionDoc{Messages: []contract.Message{}})
 	if err != nil {
@@ -225,13 +213,10 @@ func (r *redisRunSession) Length() int { return len(r.doc.Messages) }
 
 func (r *redisRunSession) UsedBytes() int { return r.doc.Bytes }
 
-func (r *redisRunSession) AppendWithin(limit, reserve int, msgs ...contract.Message) error {
+func (r *redisRunSession) Append(msgs ...contract.Message) error {
 	added := 0
 	for _, message := range msgs {
 		added += messageBytes(message)
-	}
-	if r.doc.Bytes+added+reserve > limit {
-		return contract.ErrHistoryLimit
 	}
 	next := sessionDoc{
 		Messages: append(cloneMessages(r.doc.Messages), cloneMessages(msgs)...),
@@ -242,21 +227,6 @@ func (r *redisRunSession) AppendWithin(limit, reserve int, msgs ...contract.Mess
 	}
 	r.doc = next
 	return nil
-}
-
-func (r *redisRunSession) AppendReserved(msgs ...contract.Message) {
-	added := 0
-	for _, message := range msgs {
-		added += messageBytes(message)
-	}
-	next := sessionDoc{
-		Messages: append(cloneMessages(r.doc.Messages), cloneMessages(msgs)...),
-		Bytes:    r.doc.Bytes + added,
-	}
-	if err := r.store.persist(r.ctx, r.id, r.token, next); err != nil {
-		return
-	}
-	r.doc = next
 }
 
 func (r *redisRunSession) TruncateTo(n int) {

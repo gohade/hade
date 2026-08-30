@@ -183,10 +183,6 @@ func errorEventData(err error) map[string]interface{} {
 		code = "llm_failed"
 	case errors.Is(err, contract.ErrMaxIterations):
 		code = "max_iterations"
-	case errors.Is(err, contract.ErrHistoryLimit):
-		code = "history_limit"
-	case errors.Is(err, contract.ErrMessageTooLarge):
-		code = "message_too_large"
 	case errors.Is(err, contract.ErrSessionBusy):
 		code = "session_busy"
 	case errors.Is(err, contract.ErrSessionNotFound):
@@ -218,10 +214,6 @@ func writeAgentError(c *gin.Context, err error) {
 		status = http.StatusNotFound
 	case errors.Is(err, contract.ErrSessionBusy):
 		status = http.StatusConflict
-	case errors.Is(err, contract.ErrMessageTooLarge), errors.Is(err, contract.ErrHistoryLimit):
-		status = http.StatusRequestEntityTooLarge
-	case errors.Is(err, contract.ErrSessionLimit):
-		status = http.StatusServiceUnavailable
 	}
 	message := http.StatusText(status)
 	if err != nil {

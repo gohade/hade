@@ -36,7 +36,7 @@ func (p *countingAgentProvider) instantiations() int32                    { retu
 func TestNewAgentEngineDoesNotInstantiateAgent(t *testing.T) {
 	Convey("构造 Engine 不实例化 Agent，首个请求才实例化且只实例化一次", t, func() {
 		container := framework.NewHadeContainer()
-		provider := &countingAgentProvider{agent: agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)}
+		provider := &countingAgentProvider{agent: agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)}
 		So(container.Bind(provider), ShouldBeNil)
 
 		engine, err := NewAgentEngine(container)
@@ -72,7 +72,7 @@ func TestNewAgentEngineSucceedsWithoutAgentBinding(t *testing.T) {
 		So(failed.Body.String(), ShouldNotContainSubstring, contract.AgentKey)
 
 		// 绑定后同一个 Engine 能恢复服务，说明失败没有被缓存。
-		provider := &countingAgentProvider{agent: agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)}
+		provider := &countingAgentProvider{agent: agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)}
 		So(container.Bind(provider), ShouldBeNil)
 		So(performRequest(engine, http.MethodPost, "/sessions", nil).Code, ShouldEqual, http.StatusCreated)
 		So(provider.instantiations(), ShouldEqual, 1)

@@ -18,9 +18,9 @@ import (
 )
 
 // --- from service_session_test.go ---
-func TestMemoryAgent_CreateAndGetSession(t *testing.T) {
+func TestAgentRuntime_CreateAndGetSession(t *testing.T) {
 	Convey("session crud", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		id, err := a.CreateSession(context.Background())
 		So(err, ShouldBeNil)
 		So(id, ShouldNotBeEmpty)
@@ -33,9 +33,9 @@ func TestMemoryAgent_CreateAndGetSession(t *testing.T) {
 	})
 }
 
-func TestMemoryAgent_RegisterEchoTool(t *testing.T) {
+func TestAgentRuntime_RegisterEchoTool(t *testing.T) {
 	Convey("tools", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		a.RegisterTool(contract.ToolSpec{
 			Name:        "echo",
 			Description: "echo text",
@@ -62,7 +62,7 @@ func (f *fakeLLM) Chat(ctx context.Context, req contract.ChatRequest) (contract.
 // --- from service_tools_test.go ---
 func TestRegisterTool_ValidatesAndDeduplicates(t *testing.T) {
 	Convey("空名称与 nil handler 的注册被忽略", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "  "}, func(context.Context, string) (string, error) {
 			return "", nil
 		})
@@ -71,7 +71,7 @@ func TestRegisterTool_ValidatesAndDeduplicates(t *testing.T) {
 	})
 
 	Convey("名称被去空格，同名注册覆盖而不追加", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		a.RegisterTool(contract.ToolSpec{Name: " echo ", Description: "first"},
 			func(context.Context, string) (string, error) { return "first", nil })
 		a.RegisterTool(contract.ToolSpec{Name: "echo", Description: "second"},
@@ -90,7 +90,7 @@ func TestRegisterTool_ValidatesAndDeduplicates(t *testing.T) {
 
 func TestRegisterTool_DeepCopiesParameters(t *testing.T) {
 	Convey("Parameters 被深拷贝，注册方后续修改不影响 Agent", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		properties := map[string]interface{}{
 			"text": map[string]interface{}{"type": "string"},
 		}
@@ -135,7 +135,7 @@ func TestTruncate_IsUTF8Safe(t *testing.T) {
 
 func TestExecTool_UnknownToolReturnsError(t *testing.T) {
 	Convey("未注册的工具返回错误而不是 panic", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		_, err := a.execTool(context.Background(), "missing", `{}`)
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldContainSubstring, "unknown tool: missing")
@@ -192,7 +192,7 @@ func TestRun_EchoReActThenFinal(t *testing.T) {
 				Finish:  contract.FinishStop,
 			},
 		}}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(ctx context.Context, argsJSON string) (string, error) {
 			return argsJSON, nil
 		})
@@ -225,7 +225,7 @@ func TestRun_MaxIterations(t *testing.T) {
 			toolCallResponse("c2", "echo", `{}`),
 			toolCallResponse("c3", "echo", `{}`),
 		}}
-		a := NewMemoryAgent(script, 2)
+		a := NewAgentRuntime(script, 2)
 		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(ctx context.Context, argsJSON string) (string, error) {
 			return "x", nil
 		})
@@ -249,12 +249,12 @@ func TestRun_MaxIterations(t *testing.T) {
 
 func TestRun_SettlesDanglingToolCallsBeforeUserMessage(t *testing.T) {
 	Convey("上一轮崩溃残留的 tool_calls 在本轮 Run 开始时补齐", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		id, err := a.CreateSession(context.Background())
 		So(err, ShouldBeNil)
 		held, err := a.store.TryBeginRun(context.Background(), id)
 		So(err, ShouldBeNil)
-		So(held.AppendWithin(a.limits.MaxHistoryBytes, settleReserveBytes([]contract.ToolCall{{ID: "c1"}}), contract.Message{
+		So(held.Append(contract.Message{
 			Role:      "assistant",
 			Content:   "thinking",
 			ToolCalls: []contract.ToolCall{{ID: "c1", Name: "echo", Arguments: `{}`}},
@@ -279,7 +279,7 @@ func TestRun_SettlesDanglingToolCallsBeforeUserMessage(t *testing.T) {
 
 func TestRun_SessionBusy(t *testing.T) {
 	Convey("busy", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		id, _ := a.CreateSession(context.Background())
 		run, err := a.store.TryBeginRun(context.Background(), id)
 		So(err, ShouldBeNil)
@@ -293,7 +293,7 @@ func TestRun_SessionBusy(t *testing.T) {
 func TestRun_CanceledWhenLLMReturnsAfterCtxDone(t *testing.T) {
 	Convey("canceled not llm_failed", t, func() {
 		llm := newCancelWaitLLM()
-		a := NewMemoryAgent(llm, 8)
+		a := NewAgentRuntime(llm, 8)
 		id, _ := a.CreateSession(context.Background())
 		ctx, cancel := context.WithCancel(context.Background())
 		ch := make(chan contract.AgentEvent, 8)
@@ -337,7 +337,7 @@ func TestRun_ToolHandlerCanRegisterToolWithoutDeadlock(t *testing.T) {
 				Finish:  contract.FinishStop,
 			},
 		}}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(ctx context.Context, argsJSON string) (string, error) {
 			a.RegisterTool(contract.ToolSpec{Name: "nested"}, func(ctx context.Context, argsJSON string) (string, error) {
 				return "nested", nil
@@ -371,7 +371,7 @@ func TestRun_ToolHandlerCanRegisterToolWithoutDeadlock(t *testing.T) {
 
 func TestRun_EmptyMessageNoEvents(t *testing.T) {
 	Convey("empty message", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		id, _ := a.CreateSession(context.Background())
 		ch := make(chan contract.AgentEvent, 4)
 		err := a.Run(context.Background(), id, "  ", ch)
@@ -382,7 +382,7 @@ func TestRun_EmptyMessageNoEvents(t *testing.T) {
 
 func TestRun_SessionNotFoundNoEvents(t *testing.T) {
 	Convey("session not found", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		ch := make(chan contract.AgentEvent, 4)
 		err := a.Run(context.Background(), "missing", "hi", ch)
 		So(err, ShouldEqual, contract.ErrSessionNotFound)
@@ -393,7 +393,7 @@ func TestRun_SessionNotFoundNoEvents(t *testing.T) {
 func TestRun_KeepUserOnLLMError(t *testing.T) {
 	Convey("keep user", t, func() {
 		script := &llmp.ScriptLLM{Errs: []error{contract.ErrLLMFailed}}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		id, _ := a.CreateSession(context.Background())
 		ch := make(chan contract.AgentEvent, 8)
 		go func() {
@@ -410,7 +410,7 @@ func TestRun_KeepUserOnLLMError(t *testing.T) {
 func TestGetSession_NotBlockedByRunningRun(t *testing.T) {
 	Convey("Run 长时间持有 runMu 时 GetSession 仍然快速返回", t, func() {
 		llm := newCancelWaitLLM()
-		a := NewMemoryAgent(llm, 8)
+		a := NewAgentRuntime(llm, 8)
 		id, _ := a.CreateSession(context.Background())
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -449,7 +449,7 @@ func TestGetSession_NotBlockedByRunningRun(t *testing.T) {
 	})
 }
 
-func TestMemoryAgent_ConcurrentReadWriteIsRaceFree(t *testing.T) {
+func TestAgentRuntime_ConcurrentReadWriteIsRaceFree(t *testing.T) {
 	Convey("并发 Run / GetSession / RegisterTool / ListTools 无数据竞争", t, func() {
 		script := &llmp.ScriptLLM{}
 		for i := 0; i < 64; i++ {
@@ -458,7 +458,7 @@ func TestMemoryAgent_ConcurrentReadWriteIsRaceFree(t *testing.T) {
 				Finish:  contract.FinishStop,
 			})
 		}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 
 		ids := make([]string, 0, 8)
 		for i := 0; i < 8; i++ {
@@ -520,115 +520,12 @@ func TestMemoryAgent_ConcurrentReadWriteIsRaceFree(t *testing.T) {
 	})
 }
 
-// --- from service_limits_test.go ---
-func TestCreateSession_HitsSessionLimit(t *testing.T) {
-	Convey("Session 数达到上限后返回 ErrSessionLimit", t, func() {
-		a := NewMemoryAgentWithLimits(&fakeLLM{}, 8, Limits{MaxSessions: 2})
-		first, err := a.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-		second, err := a.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-		So(first, ShouldNotEqual, second)
-
-		_, err = a.CreateSession(context.Background())
-		So(err, ShouldEqual, contract.ErrSessionLimit)
-
-		// 已有 Session 仍然可用。
-		_, err = a.GetSession(context.Background(), first)
-		So(err, ShouldBeNil)
-	})
-
-	Convey("默认上限来自 contract 常量", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
-		So(a.limits.MaxSessions, ShouldEqual, contract.DefaultMaxSessions)
-		So(a.limits.MaxMessageBytes, ShouldEqual, contract.DefaultMaxMessageBytes)
-		So(a.limits.MaxHistoryBytes, ShouldEqual, contract.DefaultMaxHistoryBytes)
-	})
-}
-
-func TestRun_RejectsOversizedUserMessage(t *testing.T) {
-	Convey("单条 user 消息超限时不产生任何事件", t, func() {
-		a := NewMemoryAgentWithLimits(&fakeLLM{}, 8, Limits{MaxMessageBytes: 16})
-		id, _ := a.CreateSession(context.Background())
-		events := make(chan contract.AgentEvent, 4)
-
-		err := a.Run(context.Background(), id, strings.Repeat("x", 17), events)
-		So(err, ShouldEqual, contract.ErrMessageTooLarge)
-		So(len(events), ShouldEqual, 0)
-
-		session := mustSession(a, id)
-		So(session.Messages, ShouldHaveLength, 0)
-
-		// 边界内的消息正常接受。
-		So(a.Run(context.Background(), id, strings.Repeat("x", 16), events), ShouldBeNil)
-	})
-}
-
-func TestRun_HistoryLimitRejectsOversizedLLMResponse(t *testing.T) {
-	Convey("LLM 单次超大响应被拒绝，历史不越界", t, func() {
-		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{{
-			Message: contract.Message{Role: "assistant", Content: strings.Repeat("y", 200)},
-			Finish:  contract.FinishStop,
-		}}}
-		a := NewMemoryAgentWithLimits(script, 8, Limits{MaxHistoryBytes: 70})
-		id, _ := a.CreateSession(context.Background())
-
-		events := make(chan contract.AgentEvent, 16)
-		done := make(chan error, 1)
-		go func() {
-			done <- a.Run(context.Background(), id, "hi", events)
-			close(events)
-		}()
-		So(waitRunErr(t, done), ShouldEqual, contract.ErrHistoryLimit)
-
-		collected := collect(events)
-		last := collected[len(collected)-1]
-		So(last.Type, ShouldEqual, contract.EventError)
-		So(last.Data["code"], ShouldEqual, "history_limit")
-		for _, event := range collected {
-			So(event.Type, ShouldNotEqual, contract.EventFinal)
-		}
-
-		session := mustSession(a, id)
-		So(session.Messages, ShouldHaveLength, 1)
-		So(session.Messages[0].Role, ShouldEqual, "user")
-		So(storeUsedBytes(a, id), ShouldBeLessThanOrEqualTo, 70)
-	})
-}
-
-func TestRun_HistoryLimitRollsBackDanglingToolCalls(t *testing.T) {
-	Convey("工具结果写不下时回滚整组 tool_calls，历史既不越界也不残留悬空 call", t, func() {
-		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
-			toolCallResponse("c1", "echo", `{}`),
-		}}
-		a := NewMemoryAgentWithLimits(script, 8, Limits{MaxHistoryBytes: 70})
-		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(context.Context, string) (string, error) {
-			return strings.Repeat("z", 200), nil
-		})
-		id, _ := a.CreateSession(context.Background())
-
-		events := make(chan contract.AgentEvent, 16)
-		done := make(chan error, 1)
-		go func() {
-			done <- a.Run(context.Background(), id, "hi", events)
-			close(events)
-		}()
-		So(waitRunErr(t, done), ShouldEqual, contract.ErrHistoryLimit)
-		collect(events)
-
-		session := mustSession(a, id)
-		assertHistoryValidForOpenAI(session.Messages)
-		So(session.Messages, ShouldHaveLength, 1)
-		So(storeUsedBytes(a, id), ShouldBeLessThanOrEqualTo, 70)
-	})
-}
-
-func TestRun_CanceledSettlementStaysWithinHistoryLimit(t *testing.T) {
-	Convey("补偿写入使用预留配额，取消后历史仍不越界", t, func() {
+func TestRun_CanceledSettlementClosesToolCall(t *testing.T) {
+	Convey("取消后补偿写入 tool 消息，历史仍合法", t, func() {
 		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
 			toolCallResponse("c1", "slow", `{}`),
 		}}
-		a := NewMemoryAgentWithLimits(script, 8, Limits{MaxHistoryBytes: 70})
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "slow"}, func(context.Context, string) (string, error) {
 			return "unused", nil
 		})
@@ -646,7 +543,6 @@ func TestRun_CanceledSettlementStaysWithinHistoryLimit(t *testing.T) {
 		session := mustSession(a, id)
 		assertHistoryValidForOpenAI(session.Messages)
 		So(toolReplies(session.Messages)["c1"], ShouldResemble, []string{settleReasonCanceled})
-		So(storeUsedBytes(a, id), ShouldBeLessThanOrEqualTo, 70)
 	})
 }
 
@@ -672,7 +568,7 @@ func waitRunErr(t *testing.T, done <-chan error) error {
 }
 
 // assertSecondRunHistory 在同一个 Session 上再跑一轮，并断言送给 LLM 的历史合法。
-func assertSecondRunHistory(t *testing.T, a *MemoryAgent, script *llmp.ScriptLLM, id string) {
+func assertSecondRunHistory(t *testing.T, a *AgentRuntime, script *llmp.ScriptLLM, id string) {
 	t.Helper()
 	events := make(chan contract.AgentEvent, 32)
 	done := make(chan error, 1)
@@ -688,26 +584,16 @@ func assertSecondRunHistory(t *testing.T, a *MemoryAgent, script *llmp.ScriptLLM
 	assertHistoryValidForOpenAI(mustSession(a, id).Messages)
 }
 
-func mustSession(a *MemoryAgent, id string) contract.Session {
+func mustSession(a *AgentRuntime, id string) contract.Session {
 	session, err := a.GetSession(context.Background(), id)
 	So(err, ShouldBeNil)
 	return session
 }
 
-func storeUsedBytes(a *MemoryAgent, id string) int {
-	msgs, err := a.store.Open(context.Background(), id)
-	So(err, ShouldBeNil)
-	used := 0
-	for _, message := range msgs {
-		used += messageBytes(message)
-	}
-	return used
-}
-
 func TestRun_CancelBeforeActionSentClosesToolCall(t *testing.T) {
 	Convey("取消发生在 action 事件发送前：pending 的 tool_call 被补 canceled", t, func() {
 		script := cancelScenarioScript()
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "slow"}, func(context.Context, string) (string, error) {
 			return "should not run", nil
 		})
@@ -735,7 +621,7 @@ func TestRun_CancelBeforeActionSentClosesToolCall(t *testing.T) {
 func TestRun_CancelBeforeObservationSentKeepsRealResult(t *testing.T) {
 	Convey("取消发生在 observation 事件发送前：保留真实结果且不重复补偿", t, func() {
 		script := cancelScenarioScript()
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "slow"}, func(context.Context, string) (string, error) {
 			return "real result", nil
 		})
@@ -764,7 +650,7 @@ func TestRun_CancelBeforeObservationSentKeepsRealResult(t *testing.T) {
 func TestRun_CancelDuringToolExecutionKeepsHistoryValid(t *testing.T) {
 	Convey("取消发生在工具执行中途：历史依然闭环", t, func() {
 		script := cancelScenarioScript()
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		entered := make(chan struct{})
 		a.RegisterTool(contract.ToolSpec{Name: "slow"}, func(ctx context.Context, _ string) (string, error) {
 			close(entered)
@@ -837,7 +723,7 @@ func TestRun_ToolPanicBecomesObservationAndLoopReachesFinal(t *testing.T) {
 			toolCallResponse("c1", "boom", `{}`),
 			{Message: contract.Message{Role: "assistant", Content: "recovered"}, Finish: contract.FinishStop},
 		}}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "boom"}, func(context.Context, string) (string, error) {
 			panic("tool exploded")
 		})
@@ -892,7 +778,7 @@ func TestRun_PanicInsideRunSettlesPendingToolCalls(t *testing.T) {
 			},
 			Finish: contract.FinishToolCalls,
 		}}}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		id, _ := a.CreateSession(context.Background())
 
 		events := make(chan contract.AgentEvent, 32)
@@ -923,7 +809,7 @@ func TestRun_PanicInsideRunSettlesPendingToolCalls(t *testing.T) {
 
 func TestRun_PanicInLLMReturnsInternal(t *testing.T) {
 	Convey("LLM 实现 panic 时 Run 返回 ErrInternal 且发 internal 事件", t, func() {
-		a := NewMemoryAgent(&panicLLM{}, 8)
+		a := NewAgentRuntime(&panicLLM{}, 8)
 		id, _ := a.CreateSession(context.Background())
 		events := make(chan contract.AgentEvent, 8)
 		done := make(chan error, 1)
@@ -957,7 +843,7 @@ func (*panicLLM) Chat(context.Context, contract.ChatRequest) (contract.ChatRespo
 func TestRun_PanicIsLoggedWithValueAndStack(t *testing.T) {
 	Convey("Run recover 把 panic value 与调用栈写进 contract.Log，但不外泄给客户端", t, func() {
 		log := &captureLog{}
-		a := NewMemoryAgent(&panicLLM{}, 8)
+		a := NewAgentRuntime(&panicLLM{}, 8)
 		a.logger = log
 
 		id, err := a.CreateSession(context.Background())
@@ -978,7 +864,7 @@ func TestRun_PanicIsLoggedWithValueAndStack(t *testing.T) {
 		stack := fmt.Sprint(entry.fields["stack"])
 		So(stack, ShouldContainSubstring, "goroutine")
 		So(stack, ShouldContainSubstring, "framework/provider/agent")
-		So(stack, ShouldContainSubstring, "MemoryAgent).Run")
+		So(stack, ShouldContainSubstring, "AgentRuntime).Run")
 
 		collected := collect(events)
 		last := collected[len(collected)-1]
@@ -989,7 +875,7 @@ func TestRun_PanicIsLoggedWithValueAndStack(t *testing.T) {
 	})
 
 	Convey("未注入 Log 时 logRunPanic 静默跳过且不 panic", t, func() {
-		a := NewMemoryAgent(&fakeLLM{}, 8)
+		a := NewAgentRuntime(&fakeLLM{}, 8)
 		So(a.logger, ShouldBeNil)
 		So(func() { a.logRunPanic(context.Background(), "sid", "boom") }, ShouldNotPanic)
 	})
@@ -1032,7 +918,7 @@ func TestGetSession_TruncatesToolCallArguments(t *testing.T) {
 			},
 			{Message: contract.Message{Role: "assistant", Content: "done"}, Finish: contract.FinishStop},
 		}}
-		a := NewMemoryAgent(script, 8)
+		a := NewAgentRuntime(script, 8)
 		a.RegisterTool(contract.ToolSpec{Name: "echo"}, func(context.Context, string) (string, error) {
 			return "ok", nil
 		})
@@ -1101,7 +987,7 @@ func TestRun_ClosedLoopAgainstOpenAIServer(t *testing.T) {
 		}))
 		defer server.Close()
 
-		a := NewMemoryAgent(llmp.NewOpenAI(server.URL, "secret-key", "fixture-model"), 8)
+		a := NewAgentRuntime(llmp.NewOpenAI(server.URL, "secret-key", "fixture-model"), 8)
 		a.RegisterTool(contract.ToolSpec{
 			Name: "echo",
 			Parameters: map[string]interface{}{

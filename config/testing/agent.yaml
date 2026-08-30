@@ -1,5 +1,2 @@
 port: ":8889"
 max_iterations: 8
-max_sessions: 1000
-max_message_bytes: 65536
-max_history_bytes: 1048576

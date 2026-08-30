@@ -32,7 +32,7 @@ func (stub *agentStub) Boot(framework.Container) error           { return nil }
 func (stub *agentStub) IsDefer() bool                            { return false }
 func (stub *agentStub) Params(framework.Container) []interface{} { return nil }
 
-func registerEcho(mem *agprovider.MemoryAgent) {
+func registerEcho(mem *agprovider.AgentRuntime) {
 	mem.RegisterTool(contract.ToolSpec{Name: "echo"}, func(_ context.Context, argsJSON string) (string, error) {
 		var args struct {
 			Text string `json:"text"`
@@ -131,7 +131,7 @@ func (agent *preStreamErrorAgent) Run(context.Context, string, string, chan<- co
 
 func TestMount_CreateSession201(t *testing.T) {
 	Convey("Mount 后 POST /sessions 返回 201 和 id", t, func() {
-		mem := agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)
+		mem := agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)
 		engine := newProtocolEngine(t, mem)
 		resp := performRequest(engine, http.MethodPost, "/sessions", nil)
 		So(resp.Code, ShouldEqual, http.StatusCreated)
@@ -151,7 +151,7 @@ func TestAgentEngineSessionAndMessagesSSE(t *testing.T) {
 			},
 			{Message: contract.Message{Content: "bye"}, Finish: contract.FinishStop},
 		}}
-		mem := agprovider.NewMemoryAgent(script, 8)
+		mem := agprovider.NewAgentRuntime(script, 8)
 		registerEcho(mem)
 		engine := newProtocolEngine(t, mem)
 
@@ -215,7 +215,7 @@ func TestAgentEngineSessionAndMessagesSSE(t *testing.T) {
 
 func TestAgentEngineMessagePreStreamErrors(t *testing.T) {
 	Convey("不存在的 session 在升流前返回 404 JSON", t, func() {
-		engine := newProtocolEngine(t, agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8))
+		engine := newProtocolEngine(t, agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8))
 		response := performRequest(
 			engine,
 			http.MethodPost,
@@ -226,7 +226,7 @@ func TestAgentEngineMessagePreStreamErrors(t *testing.T) {
 	})
 
 	Convey("空消息在升流前返回 400 JSON", t, func() {
-		mem := agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)
+		mem := agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)
 		engine := newProtocolEngine(t, mem)
 		id, err := mem.CreateSession(context.Background())
 		So(err, ShouldBeNil)
@@ -265,7 +265,7 @@ func TestGetSessionUsesSnakeCaseJSONWire(t *testing.T) {
 			},
 			{Message: contract.Message{Role: "assistant", Content: "bye"}, Finish: contract.FinishStop},
 		}}
-		mem := agprovider.NewMemoryAgent(script, 8)
+		mem := agprovider.NewAgentRuntime(script, 8)
 		registerEcho(mem)
 		engine := newProtocolEngine(t, mem)
 
@@ -407,7 +407,6 @@ func TestMessagesSupplementsErrorEventForAnyRunFailure(t *testing.T) {
 		{name: "max_iterations", runErr: contract.ErrMaxIterations, wantCode: "max_iterations"},
 		{name: "canceled", runErr: contract.ErrCanceled, wantCode: "canceled"},
 		{name: "llm_failed", runErr: contract.ErrLLMFailed, wantCode: "llm_failed"},
-		{name: "history_limit", runErr: contract.ErrHistoryLimit, wantCode: "history_limit"},
 		{name: "unknown", runErr: errors.New("something else"), wantCode: "internal"},
 	}
 	for _, testCase := range cases {
@@ -443,7 +442,7 @@ func TestMessagesSupplementsErrorEventForAnyRunFailure(t *testing.T) {
 func TestMessagesDoesNotDuplicateExistingErrorEvent(t *testing.T) {
 	Convey("Run 已经发过 error 事件时 handler 不重复补", t, func() {
 		script := &llmp.ScriptLLM{Errs: []error{errors.New("upstream down")}}
-		mem := agprovider.NewMemoryAgent(script, 8)
+		mem := agprovider.NewAgentRuntime(script, 8)
 		engine := newProtocolEngine(t, mem)
 		id, err := mem.CreateSession(context.Background())
 		So(err, ShouldBeNil)
@@ -481,7 +480,7 @@ func TestMessagesToolPanicStillReachesFinal(t *testing.T) {
 			},
 			{Message: contract.Message{Content: "survived"}, Finish: contract.FinishStop},
 		}}
-		mem := agprovider.NewMemoryAgent(script, 8)
+		mem := agprovider.NewAgentRuntime(script, 8)
 		mem.RegisterTool(contract.ToolSpec{Name: "boom"}, func(context.Context, string) (string, error) {
 			panic("tool exploded")
 		})
@@ -522,7 +521,7 @@ func TestMessagesToolPanicStillReachesFinal(t *testing.T) {
 
 func TestMessagesRejectsOversizedBody(t *testing.T) {
 	Convey("请求体超过 64KiB 时返回 413 JSON 且不升流", t, func() {
-		mem := agprovider.NewMemoryAgent(&llmp.ScriptLLM{}, 8)
+		mem := agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)
 		engine := newProtocolEngine(t, mem)
 		id, err := mem.CreateSession(context.Background())
 		So(err, ShouldBeNil)
@@ -535,66 +534,5 @@ func TestMessagesRejectsOversizedBody(t *testing.T) {
 		So(response.Code, ShouldEqual, http.StatusRequestEntityTooLarge)
 		So(response.Header().Get("Content-Type"), ShouldStartWith, "application/json")
 		So(response.Header().Get("Content-Type"), ShouldNotStartWith, "text/event-stream")
-	})
-}
-
-func TestMessagesRejectsOversizedMessage(t *testing.T) {
-	Convey("单条消息超过 Agent 上限时返回 413 JSON", t, func() {
-		mem := agprovider.NewMemoryAgentWithLimits(
-			&llmp.ScriptLLM{}, 8, agprovider.Limits{MaxMessageBytes: 8},
-		)
-		engine := newProtocolEngine(t, mem)
-		id, err := mem.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-
-		response := performRequest(
-			engine,
-			http.MethodPost,
-			"/sessions/"+id+"/messages",
-			bytes.NewBufferString(`{"message":"0123456789"}`),
-		)
-		assertJSONError(response, http.StatusRequestEntityTooLarge, contract.ErrMessageTooLarge.Error())
-	})
-}
-
-func TestMessagesMessageLimitIsReachableUnderBodyLimit(t *testing.T) {
-	Convey("body 上限严格大于消息上限，message 超限时 413 可达", t, func() {
-		So(contract.RequestBodyMaxBytes, ShouldBeGreaterThan, contract.DefaultMaxMessageBytes)
-
-		script := &llmp.ScriptLLM{Responses: []contract.ChatResponse{
-			{Message: contract.Message{Content: "ok"}, Finish: contract.FinishStop},
-		}}
-		mem := agprovider.NewMemoryAgent(script, 8)
-		engine := newProtocolEngine(t, mem)
-		id, err := mem.CreateSession(context.Background())
-		So(err, ShouldBeNil)
-
-		messageBody := func(size int) *bytes.Buffer {
-			return bytes.NewBufferString(`{"message":"` + strings.Repeat("x", size) + `"}`)
-		}
-
-		atLimit := messageBody(contract.DefaultMaxMessageBytes)
-		So(atLimit.Len(), ShouldBeLessThanOrEqualTo, contract.RequestBodyMaxBytes)
-		accepted := performRequest(engine, http.MethodPost, "/sessions/"+id+"/messages", atLimit)
-		So(accepted.Code, ShouldEqual, http.StatusOK)
-		So(accepted.Header().Get("Content-Type"), ShouldStartWith, "text/event-stream")
-
-		overLimit := messageBody(contract.DefaultMaxMessageBytes + 1)
-		So(overLimit.Len(), ShouldBeLessThanOrEqualTo, contract.RequestBodyMaxBytes)
-		rejected := performRequest(engine, http.MethodPost, "/sessions/"+id+"/messages", overLimit)
-		assertJSONError(rejected, http.StatusRequestEntityTooLarge, contract.ErrMessageTooLarge.Error())
-	})
-}
-
-func TestCreateSessionMapsSessionLimitTo503(t *testing.T) {
-	Convey("Session 数达上限时 CreateSession 返回 503 JSON", t, func() {
-		mem := agprovider.NewMemoryAgentWithLimits(
-			&llmp.ScriptLLM{}, 8, agprovider.Limits{MaxSessions: 1},
-		)
-		engine := newProtocolEngine(t, mem)
-
-		So(performRequest(engine, http.MethodPost, "/sessions", nil).Code, ShouldEqual, http.StatusCreated)
-		response := performRequest(engine, http.MethodPost, "/sessions", nil)
-		assertJSONError(response, http.StatusServiceUnavailable, contract.ErrSessionLimit.Error())
 	})
 }
