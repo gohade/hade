@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/gohade/hade/framework/cobra"
@@ -149,7 +148,7 @@ var cronRestartCommand = &cobra.Command{
 				return err
 			}
 			if util.CheckProcessExist(pid) {
-				if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+				if err := util.KillProcess(pid); err != nil {
 					return err
 				}
 				// check process closed
@@ -188,7 +187,7 @@ var cronStopCommand = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+			if err := util.KillProcess(pid); err != nil {
 				return err
 			}
 			if err := ioutil.WriteFile(serverPidFile, []byte{}, 0644); err != nil {

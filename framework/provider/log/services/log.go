@@ -33,6 +33,11 @@ func (log *HadeLog) logf(level contract.LogLevel, ctx context.Context, msg strin
 		return nil
 	}
 
+	// fields 传入为 nil 时为其分配内存 否则下文会出现  [assignment to entry in nil map] 报错
+	if fields == nil {
+		fields = make(map[string]interface{})
+	}
+
 	// 使用ctxFielder 获取context中的信息
 	fs := fields
 	if log.ctxFielder != nil {

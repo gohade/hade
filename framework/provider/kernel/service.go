@@ -1,22 +1,38 @@
 package kernel
 
 import (
-	"github.com/gohade/hade/framework/gin"
 	"net/http"
+
+	"github.com/gohade/hade/framework/gin"
+	"google.golang.org/grpc"
 )
 
-// 引擎服务
+// HadeKernelService 引擎服务
 type HadeKernelService struct {
-	engine *gin.Engine
+	httpEngine  *gin.Engine
+	grpcEngine  *grpc.Server
+	agentEngine *gin.Engine
 }
 
-// 初始化web引擎服务实例
+// NewHadeKernelService 初始化引擎服务实例
 func NewHadeKernelService(params ...interface{}) (interface{}, error) {
 	httpEngine := params[0].(*gin.Engine)
-	return &HadeKernelService{engine: httpEngine}, nil
+	grpcEngine := params[1].(*grpc.Server)
+	agentEngine := params[2].(*gin.Engine)
+	return &HadeKernelService{httpEngine: httpEngine, grpcEngine: grpcEngine, agentEngine: agentEngine}, nil
 }
 
-// 返回web引擎
+// HttpEngine 返回web引擎
 func (s *HadeKernelService) HttpEngine() http.Handler {
-	return s.engine
+	return s.httpEngine
+}
+
+// GrpcEngine 返回grpc引擎
+func (s *HadeKernelService) GrpcEngine() *grpc.Server {
+	return s.grpcEngine
+}
+
+// AgentEngine 返回 Agent API 引擎
+func (s *HadeKernelService) AgentEngine() http.Handler {
+	return s.agentEngine
 }

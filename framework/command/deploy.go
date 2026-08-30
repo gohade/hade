@@ -3,6 +3,13 @@ package command
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/cobra"
 	"github.com/gohade/hade/framework/contract"
@@ -10,16 +17,13 @@ import (
 	"github.com/gohade/hade/framework/util"
 	"github.com/pkg/errors"
 	"github.com/pkg/sftp"
-	"log"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
 )
+
+var deploySkipBuild bool
 
 // initDeployCommand 为自动化部署的命令
 func initDeployCommand() *cobra.Command {
+	deployFrontendCommand.Flags().BoolVarP(&deploySkipBuild, "skip-build", "s", false, "跳过编译(default: false)")
 	deployCommand.AddCommand(deployFrontendCommand)
 	deployCommand.AddCommand(deployBackendCommand)
 	deployCommand.AddCommand(deployAllCommand)
@@ -33,7 +37,7 @@ var deployCommand = &cobra.Command{
 	Short: "部署相关命令",
 	RunE: func(c *cobra.Command, args []string) error {
 		if len(args) == 0 {
-			c.Help()
+			_ = c.Help()
 		}
 		return nil
 	},
@@ -155,12 +159,16 @@ func deployBuildBackend(c *cobra.Command, deployFolder string) error {
 	deployBinFile := filepath.Join(deployFolder, binFile)
 	cmd := exec.Command(path, "build", "-o", deployBinFile, "./")
 	cmd.Env = os.Environ()
-	// 设置GOOS和GOARCH
+	// 设置GOOS和GOARCH,如果设置了交叉编译工具链，则设置CGO_ENABLED=1
 	if configService.GetString("deploy.backend.goos") != "" {
 		cmd.Env = append(cmd.Env, "GOOS="+configService.GetString("deploy.backend.goos"))
 	}
 	if configService.GetString("deploy.backend.goarch") != "" {
 		cmd.Env = append(cmd.Env, "GOARCH="+configService.GetString("deploy.backend.goarch"))
+	}
+	if configService.GetString("deploy.backend.gocc") != "" {
+		cmd.Env = append(cmd.Env, "CGO_ENABLED=1")
+		cmd.Env = append(cmd.Env, "CC="+configService.GetString("deploy.backend.gocc"))
 	}
 
 	// 执行命令
@@ -170,6 +178,7 @@ func deployBuildBackend(c *cobra.Command, deployFolder string) error {
 		logger.Error(ctx, "go build err", map[string]interface{}{
 			"err": err,
 			"out": string(out),
+			"cmd": cmd.String(),
 		})
 		return err
 	}
@@ -251,6 +260,12 @@ func deployUploadAction(deployFolder string, container framework.Container, end 
 			bts, err := session.CombinedOutput(action)
 			if err != nil {
 				session.Close()
+				logger.Error(context.Background(), "execute pre action failed", map[string]interface{}{
+					"err":        err,
+					"cmd":        action,
+					"connection": node,
+					"output":     string(bts),
+				})
 				return err
 			}
 			session.Close()
@@ -376,9 +391,11 @@ func deployBuildFrontend(c *cobra.Command, deployFolder string) error {
 	container := c.GetContainer()
 	appService := container.MustMake(contract.AppKey).(contract.App)
 
-	// 编译前端
-	if err := buildFrontendCommand.RunE(c, []string{}); err != nil {
-		return err
+	if deploySkipBuild == false {
+		// 编译前端
+		if err := buildFrontendCommand.RunE(c, []string{}); err != nil {
+			return err
+		}
 	}
 
 	// 复制前端文件到deploy文件夹
@@ -398,6 +415,13 @@ func deployBuildFrontend(c *cobra.Command, deployFolder string) error {
 func createDeployFolder(c framework.Container) (string, error) {
 	appService := c.MustMake(contract.AppKey).(contract.App)
 	deployFolder := appService.DeployFolder()
+
+	// 如果部署文件夹不存在，则创建
+	if !util.Exists(deployFolder) {
+		if err := os.Mkdir(deployFolder, os.ModePerm); err != nil {
+			return "", err
+		}
+	}
 
 	deployVersion := time.Now().Format("20060102150405")
 	versionFolder := filepath.Join(deployFolder, deployVersion)

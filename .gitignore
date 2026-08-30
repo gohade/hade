@@ -10,6 +10,8 @@ selenium-debug.log
 hade
 storage
 /deploy/
+/config/hadeoffice
+.env
 
 # Editor directories and files
 .idea
@@ -18,3 +20,6 @@ storage
 *.ntvs*
 *.njsproj
 *.sln
+hade.exe
+docs/.vuepress/.temp/
+docs/.vuepress/.cache/

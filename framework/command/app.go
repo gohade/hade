@@ -3,6 +3,16 @@ package command
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/erikdubbelboer/gspt"
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/cobra"
@@ -10,24 +20,51 @@ import (
 	"github.com/gohade/hade/framework/util"
 	"github.com/pkg/errors"
 	"github.com/sevlyar/go-daemon"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"os/signal"
-	"path/filepath"
-	"strconv"
-	"syscall"
-	"time"
 )
 
 // app启动地址
 var appAddress = ""
 var appDaemon = false
 
+// appBaseArgs对应AppService中可以配置的参数
+var appStartArgs = []string{
+	"base_folder",
+	"config_folder",
+	"log_folder",
+	"http_folder",
+	"console_folder",
+	"storage_folder",
+	"provider_folder",
+	"middleware_folder",
+	"command_folder",
+	"runtime_folder",
+	"test_folder",
+	"deploy_folder",
+	"app_folder",
+}
+
+var appOtherArgs = []string{
+	"runtime_folder",
+	"storage_folder",
+	"base_folder",
+}
+
 // initAppCommand 初始化app命令和其子命令
 func initAppCommand() *cobra.Command {
-	appStartCommand.Flags().BoolVarP(&appDaemon, "daemon", "d", false, "start app daemon")
+	appStartCommand.Flags().BoolVarP(&appDaemon, "daemon", "d", false, "开启后台模式")
 	appStartCommand.Flags().StringVar(&appAddress, "address", "", "设置app启动的地址，默认为:8888")
+
+	for _, arg := range appStartArgs {
+		tmp := ""
+		appStartCommand.Flags().StringVar(&tmp, arg, "", "base config for app service: "+arg)
+	}
+
+	for _, arg := range appOtherArgs {
+		tmp := ""
+		appRestartCommand.Flags().StringVar(&tmp, arg, "", "base config for app service: "+arg)
+		appStateCommand.Flags().StringVar(&tmp, arg, "", "base config for app service: "+arg)
+		appStopCommand.Flags().StringVar(&tmp, arg, "", "base config for app service: "+arg)
+	}
 
 	appCommand.AddCommand(appStartCommand)
 	appCommand.AddCommand(appRestartCommand)
@@ -89,6 +126,7 @@ var appStartCommand = &cobra.Command{
 		// 从kernel服务实例中获取引擎
 		core := kernelService.HttpEngine()
 
+		// 先读取参数，然后读取Env，然后读取配置文件
 		if appAddress == "" {
 			envService := container.MustMake(contract.EnvKey).(contract.Env)
 			if envService.Get("ADDRESS") != "" {
@@ -123,11 +161,28 @@ var appStartCommand = &cobra.Command{
 				return err
 			}
 		}
+
+		processName := "hade app"
+		if len(os.Args) > 0 {
+			processName = filepath.Base(os.Args[0]) + " app"
+		}
+
 		// 应用日志
 		serverLogFile := filepath.Join(logFolder, "app.log")
 		currentFolder := util.GetExecDirectory()
 		// daemon 模式
 		if appDaemon {
+			parentArgs := make([]string, 0, len(os.Args))
+			for _, arg := range os.Args {
+				if strings.HasPrefix(arg, "--") {
+					if strings.Contains(arg, "--daemon=") {
+						continue
+					}
+					parentArgs = append(parentArgs, arg)
+				}
+			}
+			subArgs := []string{filepath.Base(os.Args[0]), "app", "start", "--daemon=true"}
+			subArgs = append(subArgs, parentArgs...)
 			// 创建一个Context
 			cntxt := &daemon.Context{
 				// 设置pid文件
@@ -141,7 +196,9 @@ var appStartCommand = &cobra.Command{
 				// 设置所有设置文件的mask，默认为750
 				Umask: 027,
 				// 子进程的参数，按照这个参数设置，子进程的命令为 ./hade app start --daemon=true
-				Args: []string{"", "app", "start", "--daemon=true"},
+				Args: subArgs,
+				// 环境变量和父进程一样
+				Env: os.Environ(),
 			}
 			// 启动子进程，d不为空表示当前是父进程，d为空表示当前是子进程
 			d, err := cntxt.Reborn()
@@ -150,14 +207,23 @@ var appStartCommand = &cobra.Command{
 			}
 			if d != nil {
 				// 父进程直接打印启动成功信息，不做任何操作
-				fmt.Println("app启动成功，pid:", d.Pid)
-				fmt.Println("日志文件:", serverLogFile)
+				fmt.Println("成功启动进程:", processName)
+				fmt.Println("进程pid:", d.Pid)
+				showAppAddress := appAddress
+				if strings.HasPrefix(appAddress, ":") {
+					showAppAddress = "http://localhost" + showAppAddress
+				}
+				fmt.Println("监听地址:", showAppAddress)
+				fmt.Println("基础路径:", appService.BaseFolder())
+				fmt.Println("日志路径:", appService.LogFolder())
+				fmt.Println("运行路径:", appService.RuntimeFolder())
+				fmt.Println("配置路径:", appService.ConfigFolder())
 				return nil
 			}
 			defer cntxt.Release()
 			// 子进程执行真正的app启动操作
-			fmt.Println("deamon started")
-			//gspt.SetProcTitle("hade app")
+			fmt.Println("daemon started")
+			gspt.SetProcTitle(processName)
 			if err := startAppServe(server, container); err != nil {
 				fmt.Println(err)
 			}
@@ -166,14 +232,25 @@ var appStartCommand = &cobra.Command{
 
 		// 非deamon模式，直接执行
 		content := strconv.Itoa(os.Getpid())
-		fmt.Println("[PID]", content)
+		fmt.Println("成功启动进程:", processName)
+		fmt.Println("进程pid:", content)
 		err := ioutil.WriteFile(serverPidFile, []byte(content), 0644)
 		if err != nil {
 			return err
 		}
-		gspt.SetProcTitle("hade app")
 
-		fmt.Println("app serve url:", appAddress)
+		gspt.SetProcTitle(processName)
+
+		showAppAddress := appAddress
+		if strings.HasPrefix(appAddress, ":") {
+			showAppAddress = "http://localhost" + showAppAddress
+		}
+		fmt.Println("监听地址:", showAppAddress)
+		fmt.Println("基础路径:", appService.BaseFolder())
+		fmt.Println("日志路径:", appService.LogFolder())
+		fmt.Println("运行路径:", appService.RuntimeFolder())
+		fmt.Println("配置路径:", appService.ConfigFolder())
+
 		if err := startAppServe(server, container); err != nil {
 			fmt.Println(err)
 		}
@@ -210,7 +287,7 @@ var appRestartCommand = &cobra.Command{
 			}
 			if util.CheckProcessExist(pid) {
 				// 杀死进程
-				if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+				if err := util.KillProcess(pid); err != nil {
 					return err
 				}
 
@@ -269,8 +346,7 @@ var appStopCommand = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			// 发送SIGTERM命令
-			if err := syscall.Kill(pid, syscall.SIGTERM); err != nil {
+			if err := util.KillProcess(pid); err != nil {
 				return err
 			}
 			if err := ioutil.WriteFile(serverPidFile, []byte{}, 0644); err != nil {
