@@ -14,4 +14,6 @@ type Kernel interface {
 	HttpEngine() http.Handler
 	// GrpcEngine 提供grpc的Engine结构
 	GrpcEngine() *grpc.Server
+	// AgentEngine 提供 Agent API 的 Engine 结构
+	AgentEngine() http.Handler
 }

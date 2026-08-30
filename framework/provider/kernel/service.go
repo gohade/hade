@@ -9,15 +9,17 @@ import (
 
 // HadeKernelService 引擎服务
 type HadeKernelService struct {
-	httpEngine *gin.Engine
-	grpcEngine *grpc.Server
+	httpEngine  *gin.Engine
+	grpcEngine  *grpc.Server
+	agentEngine *gin.Engine
 }
 
 // NewHadeKernelService 初始化引擎服务实例
 func NewHadeKernelService(params ...interface{}) (interface{}, error) {
 	httpEngine := params[0].(*gin.Engine)
 	grpcEngine := params[1].(*grpc.Server)
-	return &HadeKernelService{httpEngine: httpEngine, grpcEngine: grpcEngine}, nil
+	agentEngine := params[2].(*gin.Engine)
+	return &HadeKernelService{httpEngine: httpEngine, grpcEngine: grpcEngine, agentEngine: agentEngine}, nil
 }
 
 // HttpEngine 返回web引擎
@@ -28,4 +30,9 @@ func (s *HadeKernelService) HttpEngine() http.Handler {
 // GrpcEngine 返回grpc引擎
 func (s *HadeKernelService) GrpcEngine() *grpc.Server {
 	return s.grpcEngine
+}
+
+// AgentEngine 返回 Agent API 引擎
+func (s *HadeKernelService) AgentEngine() http.Handler {
+	return s.agentEngine
 }

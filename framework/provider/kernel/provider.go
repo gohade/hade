@@ -9,8 +9,9 @@ import (
 
 // HadeKernelProvider 提供web引擎
 type HadeKernelProvider struct {
-	HttpEngine *gin.Engine
-	GrpcEngine *grpc.Server
+	HttpEngine  *gin.Engine
+	GrpcEngine  *grpc.Server
+	AgentEngine *gin.Engine
 }
 
 // Register 注册服务提供者
@@ -26,7 +27,11 @@ func (provider *HadeKernelProvider) Boot(c framework.Container) error {
 	if provider.GrpcEngine == nil {
 		provider.GrpcEngine = grpc.NewServer()
 	}
+	if provider.AgentEngine == nil {
+		provider.AgentEngine = gin.Default()
+	}
 	provider.HttpEngine.SetContainer(c)
+	provider.AgentEngine.SetContainer(c)
 	return nil
 }
 
@@ -35,9 +40,9 @@ func (provider *HadeKernelProvider) IsDefer() bool {
 	return false
 }
 
-// Params 参数就是一个HttpEngine
+// Params 参数依次为 HTTP、gRPC 和 Agent 引擎
 func (provider *HadeKernelProvider) Params(c framework.Container) []interface{} {
-	return []interface{}{provider.HttpEngine, provider.GrpcEngine}
+	return []interface{}{provider.HttpEngine, provider.GrpcEngine, provider.AgentEngine}
 }
 
 // Name 提供凭证
