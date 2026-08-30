@@ -115,9 +115,23 @@ func (p *stubRedisProvider) IsDefer() bool                            { return f
 func (p *stubRedisProvider) Params(framework.Container) []interface{} { return nil }
 
 func TestHadeAgentProvider_InjectsRedisStore(t *testing.T) {
-	Convey("绑定 Redis 后 Params 注入 Redis store，Create 写进 miniredis", t, func() {
+	Convey("仅绑定 Redis、未配置 session_store 时默认内存，不注入 Redis store", t, func() {
 		_, client := miniClient(t)
 		container := framework.NewHadeContainer()
+		bindLLMFor(container)
+		So(container.Bind(&stubRedisProvider{svc: &stubRedisService{client: client}}), ShouldBeNil)
+
+		params := (&HadeAgentProvider{}).Params(container)
+		So(params[3], ShouldBeNil)
+	})
+
+	Convey("session_store=redis 且 Ping 成功时注入 Redis store，Create 写进 miniredis", t, func() {
+		_, client := miniClient(t)
+		container := framework.NewHadeContainer()
+		So(container.Bind(&configprovider.FakeConfigProvider{
+			FileName: "agent",
+			Content:  []byte("session_store: redis\n"),
+		}), ShouldBeNil)
 		bindLLMFor(container)
 		So(container.Bind(&stubRedisProvider{svc: &stubRedisService{client: client}}), ShouldBeNil)
 
@@ -137,13 +151,19 @@ func TestHadeAgentProvider_InjectsRedisStore(t *testing.T) {
 		So(msgs, ShouldBeEmpty)
 	})
 
-	Convey("GetClient 失败时 NewHadeAgentService 返回 error，不退回内存", t, func() {
+	Convey("session_store=redis 但 GetClient 失败时回退内存，构造仍成功", t, func() {
 		container := framework.NewHadeContainer()
+		So(container.Bind(&configprovider.FakeConfigProvider{
+			FileName: "agent",
+			Content:  []byte("session_store: redis\n"),
+		}), ShouldBeNil)
 		bindLLMFor(container)
 		So(container.Bind(&stubRedisProvider{svc: &stubRedisService{err: errors.New("dial")}}), ShouldBeNil)
 		params := (&HadeAgentProvider{}).Params(container)
-		_, err := NewHadeAgentService(params...)
-		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldContainSubstring, "dial")
+		So(params[3], ShouldBeNil)
+		instance, err := NewHadeAgentService(params...)
+		So(err, ShouldBeNil)
+		_, isMemory := instance.(*AgentRuntime).store.(*memoryStore)
+		So(isMemory, ShouldBeTrue)
 	})
 }

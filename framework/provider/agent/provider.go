@@ -1,6 +1,10 @@
 package agent
 
 import (
+	"context"
+	"strings"
+	"time"
+
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/contract"
 )
@@ -30,15 +34,47 @@ func (p *HadeAgentProvider) Params(c framework.Container) []interface{} {
 	if c.IsBind(contract.LogKey) {
 		logger = c.MustMake(contract.LogKey).(contract.Log)
 	}
-	var store interface{}
-	if c.IsBind(contract.RedisKey) {
-		redisService := c.MustMake(contract.RedisKey).(contract.RedisService)
-		client, err := redisService.GetClient()
-		if err != nil {
-			store = err
-		} else {
-			store = newRedisStore(client)
-		}
+	return []interface{}{llm, maxIter, logger, sessionStoreFrom(c, logger)}
+}
+
+func wantRedisSessionStore(c framework.Container) bool {
+	if !c.IsBind(contract.ConfigKey) {
+		return false
 	}
-	return []interface{}{llm, maxIter, logger, store}
+	cfg := c.MustMake(contract.ConfigKey).(contract.Config)
+	return strings.EqualFold(strings.TrimSpace(cfg.GetString("agent.session_store")), "redis")
+}
+
+func logSessionStoreFallback(logger contract.Log, reason string) {
+	if logger == nil {
+		return
+	}
+	defer func() { _ = recover() }()
+	logger.Warn(context.Background(), "agent session store fallback to memory", map[string]interface{}{
+		"reason": reason,
+	})
+}
+
+// sessionStoreFrom 默认内存。仅当 agent.session_store=redis 且 Redis Ping 成功时才用 Redis。
+func sessionStoreFrom(c framework.Container, logger contract.Log) interface{} {
+	if !wantRedisSessionStore(c) {
+		return nil
+	}
+	if !c.IsBind(contract.RedisKey) {
+		logSessionStoreFallback(logger, "redis service not bound")
+		return nil
+	}
+	redisService := c.MustMake(contract.RedisKey).(contract.RedisService)
+	client, err := redisService.GetClient()
+	if err != nil {
+		logSessionStoreFallback(logger, err.Error())
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := client.Ping(ctx).Err(); err != nil {
+		logSessionStoreFallback(logger, err.Error())
+		return nil
+	}
+	return newRedisStore(client)
 }

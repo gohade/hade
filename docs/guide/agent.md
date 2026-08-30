@@ -2,6 +2,8 @@
 
 独立进程，默认端口 `:8889`（`config/{env}/agent.yaml` 的 `port`）。
 
+Session 默认存在**进程内存**（`session_store: memory`）。`main.go` 即使绑定了 Redis Provider，也不会自动用 Redis 存对话。多实例共享时在 `agent.yaml` 设 `session_store: redis`，并保证 Redis 可连；Ping 失败会打 Warn 并回退内存，避免 `POST /sessions` 变成 `{"error":"internal"}`。
+
 ## DeepSeek
 
 在项目根 `.env` 中设置（该文件已 gitignore）：
