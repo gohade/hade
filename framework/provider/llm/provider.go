@@ -45,5 +45,9 @@ func (p *HadeLLMProvider) Params(c framework.Container) []interface{} {
 			model = config.GetString("llm.model")
 		}
 	}
-	return []interface{}{baseURL, apiKey, model}
+	var logger contract.Log
+	if c.IsBind(contract.LogKey) {
+		logger = c.MustMake(contract.LogKey).(contract.Log)
+	}
+	return []interface{}{baseURL, apiKey, model, logger}
 }

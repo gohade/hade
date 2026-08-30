@@ -265,14 +265,17 @@ func TestHadeLLMProviderDefaultsAndConfig(t *testing.T) {
 			t.Fatalf("provider metadata is invalid")
 		}
 		got := provider.Params(framework.NewHadeContainer())
-		want := []interface{}{"https://api.openai.com/v1", "", "gpt-4o-mini"}
-		if len(got) != len(want) {
+		if len(got) != 4 {
 			t.Fatalf("Params() = %#v", got)
 		}
+		want := []interface{}{"https://api.openai.com/v1", "", "gpt-4o-mini"}
 		for i := range want {
 			if got[i] != want[i] {
 				t.Fatalf("Params()[%d] = %#v, want %#v", i, got[i], want[i])
 			}
+		}
+		if got[3] != nil {
+			t.Fatalf("Params()[3] logger = %#v, want nil", got[3])
 		}
 	})
 
@@ -296,7 +299,82 @@ model: configured-model
 				t.Fatalf("Params()[%d] = %#v, want %#v", i, got[i], want[i])
 			}
 		}
+		if got[3] != nil {
+			t.Fatalf("Params()[3] logger = %#v, want nil", got[3])
+		}
 	})
+}
+
+type captureLog struct {
+	debugs []captureLogEntry
+}
+
+type captureLogEntry struct {
+	msg    string
+	fields map[string]interface{}
+}
+
+func (c *captureLog) Panic(context.Context, string, map[string]interface{}) {}
+func (c *captureLog) Fatal(context.Context, string, map[string]interface{}) {}
+func (c *captureLog) Error(context.Context, string, map[string]interface{}) {}
+func (c *captureLog) Warn(context.Context, string, map[string]interface{})  {}
+func (c *captureLog) Info(context.Context, string, map[string]interface{})  {}
+func (c *captureLog) Debug(_ context.Context, msg string, fields map[string]interface{}) {
+	c.debugs = append(c.debugs, captureLogEntry{msg: msg, fields: fields})
+}
+func (c *captureLog) Trace(context.Context, string, map[string]interface{}) {}
+func (c *captureLog) SetLevel(contract.LogLevel)                            {}
+func (c *captureLog) SetCtxFielder(contract.CtxFielder)                     {}
+func (c *captureLog) SetFormatter(contract.Formatter)                       {}
+func (c *captureLog) SetOutput(io.Writer)                                   {}
+
+func TestOpenAIChatLogsBodiesWithoutSecrets(t *testing.T) {
+	const apiKey = "secret-key-must-not-appear"
+	responseJSON := `{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"logged-reply"}}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+apiKey {
+			t.Errorf("Authorization = %q", r.Header.Get("Authorization"))
+		}
+		_, _ = io.WriteString(w, responseJSON)
+	}))
+	defer server.Close()
+
+	log := &captureLog{}
+	client := NewOpenAI(server.URL, apiKey, "fixture-model")
+	client.logger = log
+	_, err := client.Chat(context.Background(), contract.ChatRequest{
+		Messages: []contract.Message{{Role: "user", Content: "hello-from-test"}},
+	})
+	if err != nil {
+		t.Fatalf("Chat() error = %v", err)
+	}
+	if len(log.debugs) != 1 {
+		t.Fatalf("debug logs = %#v", log.debugs)
+	}
+	entry := log.debugs[0]
+	if entry.msg != "llm chat" {
+		t.Fatalf("msg = %q", entry.msg)
+	}
+	request, _ := entry.fields["request"].(string)
+	response, _ := entry.fields["response"].(string)
+	if request == "" || !contains(request, "hello-from-test") {
+		t.Fatalf("request = %q", request)
+	}
+	if response != responseJSON {
+		t.Fatalf("response = %q", response)
+	}
+	if _, ok := entry.fields["authorization"]; ok {
+		t.Fatal("logged authorization header")
+	}
+	if _, ok := entry.fields["api_key"]; ok {
+		t.Fatal("logged api_key field")
+	}
+	for _, value := range entry.fields {
+		text, _ := value.(string)
+		if contains(text, apiKey) || contains(text, "Bearer") {
+			t.Fatalf("leaked secret in fields: %#v", entry.fields)
+		}
+	}
 }
 
 func contains(s, sub string) bool {

@@ -15,6 +15,8 @@ DEEPSEEK_API_KEY=你的key
 
 `config/development/llm.yaml` 使用 OpenAI 兼容接口：`https://api.deepseek.com/v1`，模型 `deepseek-chat`。
 
+每次 `Chat` 会把请求体和响应体打到 **Debug** 日志（`log.level` 为 `debug`/`trace` 时可见），不记录 `Authorization` 和 API Key。development 默认 `log.level: trace`，rotate 文件在应用 log 目录。
+
 ## 启动与演示
 
 ```

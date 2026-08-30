@@ -25,6 +25,7 @@ type OpenAI struct {
 	apiKey  string
 	model   string
 	client  *http.Client
+	logger  contract.Log
 }
 
 // NewOpenAI 创建一个使用 60 秒超时的 OpenAI 兼容客户端。
@@ -42,7 +43,13 @@ func NewHadeLLM(params ...interface{}) (interface{}, error) {
 	baseURL := params[0].(string)
 	apiKey := params[1].(string)
 	model := params[2].(string)
-	return NewOpenAI(baseURL, apiKey, model), nil
+	client := NewOpenAI(baseURL, apiKey, model)
+	if len(params) > 3 {
+		if logger, ok := params[3].(contract.Log); ok {
+			client.logger = logger
+		}
+	}
+	return client, nil
 }
 
 // Chat 调用 OpenAI 兼容的 Chat Completions API。
@@ -76,9 +83,22 @@ func (o *OpenAI) Chat(ctx context.Context, req contract.ChatRequest) (contract.C
 	if err != nil {
 		return contract.ChatResponse{}, fmt.Errorf("%w: read response", contract.ErrLLMFailed)
 	}
+	o.logChat(ctx, body, responseBody)
 	result, err := ParseOpenAIResponse(responseBody)
 	if err != nil {
 		return contract.ChatResponse{}, fmt.Errorf("%w: parse response", contract.ErrLLMFailed)
 	}
 	return result, nil
+}
+
+func (o *OpenAI) logChat(ctx context.Context, requestBody, responseBody []byte) {
+	if o.logger == nil {
+		return
+	}
+	defer func() { _ = recover() }()
+	o.logger.Debug(ctx, "llm chat", map[string]interface{}{
+		"model":    o.model,
+		"request":  string(requestBody),
+		"response": string(responseBody),
+	})
 }
