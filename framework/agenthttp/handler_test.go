@@ -32,6 +32,18 @@ func (stub *agentStub) Boot(framework.Container) error           { return nil }
 func (stub *agentStub) IsDefer() bool                            { return false }
 func (stub *agentStub) Params(framework.Container) []interface{} { return nil }
 
+type llmStub struct {
+	llm contract.LLM
+}
+
+func (stub *llmStub) Name() string { return contract.LLMKey }
+func (stub *llmStub) Register(framework.Container) framework.NewInstance {
+	return func(params ...interface{}) (interface{}, error) { return stub.llm, nil }
+}
+func (stub *llmStub) Boot(framework.Container) error           { return nil }
+func (stub *llmStub) IsDefer() bool                            { return false }
+func (stub *llmStub) Params(framework.Container) []interface{} { return nil }
+
 func registerEcho(mem *agprovider.AgentRuntime) {
 	mem.RegisterTool(contract.ToolSpec{Name: "echo"}, func(_ context.Context, argsJSON string) (string, error) {
 		var args struct {
@@ -48,6 +60,22 @@ func newProtocolEngine(t *testing.T, agent contract.Agent) http.Handler {
 	t.Helper()
 	container := framework.NewHadeContainer()
 	if err := container.Bind(&agentStub{agent: agent}); err != nil {
+		t.Fatal(err)
+	}
+	gin.SetMode(gin.ReleaseMode)
+	engine := gin.New()
+	engine.SetContainer(container)
+	Mount(engine)
+	return engine
+}
+
+func newConsoleEngine(t *testing.T, agent contract.Agent, llm contract.LLM) http.Handler {
+	t.Helper()
+	container := framework.NewHadeContainer()
+	if err := container.Bind(&agentStub{agent: agent}); err != nil {
+		t.Fatal(err)
+	}
+	if err := container.Bind(&llmStub{llm: llm}); err != nil {
 		t.Fatal(err)
 	}
 	gin.SetMode(gin.ReleaseMode)
@@ -136,6 +164,58 @@ func TestMount_CreateSession201(t *testing.T) {
 		resp := performRequest(engine, http.MethodPost, "/sessions", nil)
 		So(resp.Code, ShouldEqual, http.StatusCreated)
 		So(resp.Body.String(), ShouldContainSubstring, `"id":`)
+	})
+}
+
+func TestAgentConsoleUIAndRuntimeConfig(t *testing.T) {
+	Convey("调试台资源由 Agent 服务直接提供", t, func() {
+		mem := agprovider.NewAgentRuntime(&llmp.ScriptLLM{}, 8)
+		engine := newConsoleEngine(t, mem, llmp.NewOpenAI("https://api.example.com/v1", "secret", "old-model"))
+
+		index := performRequest(engine, http.MethodGet, "/", nil)
+		So(index.Code, ShouldEqual, http.StatusOK)
+		So(index.Header().Get("Content-Type"), ShouldStartWith, "text/html")
+		So(index.Body.String(), ShouldContainSubstring, "Hade Agent Console")
+		So(index.Header().Get("Content-Security-Policy"), ShouldNotBeBlank)
+
+		asset := performRequest(engine, http.MethodGet, "/agent-ui.js", nil)
+		So(asset.Code, ShouldEqual, http.StatusOK)
+		So(asset.Header().Get("Content-Type"), ShouldStartWith, "text/javascript")
+	})
+
+	Convey("配置接口热更新模型且永不回传 API Key", t, func() {
+		model := llmp.NewOpenAI("https://api.example.com/v1", "old-secret", "old-model")
+		mem := agprovider.NewAgentRuntime(model, 8)
+		engine := newConsoleEngine(t, mem, model)
+
+		get := performRequest(engine, http.MethodGet, "/config", nil)
+		So(get.Code, ShouldEqual, http.StatusOK)
+		So(get.Body.String(), ShouldContainSubstring, `"api_key_configured":true`)
+		So(get.Body.String(), ShouldNotContainSubstring, "old-secret")
+
+		update := performRequest(engine, http.MethodPut, "/config", bytes.NewBufferString(
+			`{"base_url":"https://api.deepseek.com/v1","model":"deepseek-chat","api_key":"new-secret"}`,
+		))
+		So(update.Code, ShouldEqual, http.StatusOK)
+		So(update.Body.String(), ShouldNotContainSubstring, "new-secret")
+		So(model.Configuration(), ShouldResemble, contract.LLMConfig{
+			BaseURL: "https://api.deepseek.com/v1", APIKey: "new-secret", Model: "deepseek-chat",
+		})
+
+		preserve := performRequest(engine, http.MethodPut, "/config", bytes.NewBufferString(
+			`{"base_url":"https://api.openai.com/v1/","model":"gpt-4o-mini"}`,
+		))
+		So(preserve.Code, ShouldEqual, http.StatusOK)
+		So(model.Configuration().APIKey, ShouldEqual, "new-secret")
+	})
+
+	Convey("配置接口拒绝非 HTTP 地址", t, func() {
+		model := llmp.NewOpenAI("https://api.example.com/v1", "secret", "model")
+		engine := newConsoleEngine(t, agprovider.NewAgentRuntime(model, 8), model)
+		response := performRequest(engine, http.MethodPut, "/config", bytes.NewBufferString(
+			`{"base_url":"file:///tmp/model","model":"unsafe"}`,
+		))
+		So(response.Code, ShouldEqual, http.StatusBadRequest)
 	})
 }
 

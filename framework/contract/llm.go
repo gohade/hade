@@ -67,3 +67,19 @@ type ChatResponse struct {
 type LLM interface {
 	Chat(ctx context.Context, req ChatRequest) (ChatResponse, error)
 }
+
+// LLMConfig 是可在运行时切换的模型连接配置。
+// APIKey 属于敏感信息，HTTP 接口只返回是否已配置，绝不回传原文。
+type LLMConfig struct {
+	BaseURL string
+	APIKey  string
+	Model   string
+}
+
+// ConfigurableLLM 允许 Agent 调试台在不重启进程的情况下切换模型。
+// 实现必须保证 Configuration、Configure 与 Chat 并发安全。
+type ConfigurableLLM interface {
+	LLM
+	Configuration() LLMConfig
+	Configure(LLMConfig) error
+}

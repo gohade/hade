@@ -21,16 +21,28 @@ var errAgentUnavailable = errors.New("agent service unavailable")
 
 // NewAgentEngine 创建只承载 Agent API 的独立 HTTP 引擎。
 //
-// 构造期不做任何 Make/MustMake：非 Agent 命令（例如 hade build）也会走 main 的
-// 引擎装配流程，不应该因此实例化 LLM/Agent Provider。
+// 构造期不实例化 LLM/Agent Provider：非 Agent 命令（例如 hade build）也会走
+// main 的引擎装配流程。这里只读取已经绑定的 Console 开关。
 func NewAgentEngine(container framework.Container) (*gin.Engine, error) {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 	engine.SetContainer(container)
 	engine.Use(gin.Recovery())
 	engine.Use((&agentResolver{}).Middleware)
-	agenthttp.Mount(engine)
+	agenthttp.MountWithConsole(engine, consoleEnabledFrom(container))
 	return engine, nil
+}
+
+// consoleEnabledFrom 默认开启内置调试台；只有显式配置 false 时关闭。
+func consoleEnabledFrom(container framework.Container) bool {
+	if container == nil || !container.IsBind(contract.ConfigKey) {
+		return true
+	}
+	config := container.MustMake(contract.ConfigKey).(contract.Config)
+	if !config.IsExist("agent.console_enabled") {
+		return true
+	}
+	return config.GetBool("agent.console_enabled")
 }
 
 // agentResolver 惰性解析容器中的 Agent，并保证示例工具只成功注册一次。
