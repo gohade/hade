@@ -1,3 +1,4 @@
 port: ":8889"
 max_iterations: 8
 session_store: memory
+console_enabled: true

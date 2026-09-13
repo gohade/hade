@@ -15,8 +15,20 @@ func NewAgentEngine(container framework.Container) (*gin.Engine, error) {
 	engine.SetContainer(container)
 	engine.Use(gin.Recovery())
 	registerExampleToolsFrom(container)
-	agenthttp.Mount(engine)
+	agenthttp.MountWithConsole(engine, consoleEnabledFrom(container))
 	return engine, nil
+}
+
+// consoleEnabledFrom 默认开启内置调试台；只有显式配置 false 时关闭。
+func consoleEnabledFrom(container framework.Container) bool {
+	if container == nil || !container.IsBind(contract.ConfigKey) {
+		return true
+	}
+	config := container.MustMake(contract.ConfigKey).(contract.Config)
+	if !config.IsExist("agent.console_enabled") {
+		return true
+	}
+	return config.GetBool("agent.console_enabled")
 }
 
 func registerExampleToolsFrom(container framework.Container) {
