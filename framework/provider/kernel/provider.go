@@ -4,11 +4,14 @@ import (
 	"github.com/gohade/hade/framework"
 	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/gin"
+	"google.golang.org/grpc"
 )
 
 // HadeKernelProvider 提供web引擎
 type HadeKernelProvider struct {
-	HttpEngine *gin.Engine
+	HttpEngine  *gin.Engine
+	GrpcEngine  *grpc.Server
+	AgentEngine *gin.Engine
 }
 
 // Register 注册服务提供者
@@ -21,7 +24,14 @@ func (provider *HadeKernelProvider) Boot(c framework.Container) error {
 	if provider.HttpEngine == nil {
 		provider.HttpEngine = gin.Default()
 	}
+	if provider.GrpcEngine == nil {
+		provider.GrpcEngine = grpc.NewServer()
+	}
+	if provider.AgentEngine == nil {
+		provider.AgentEngine = gin.Default()
+	}
 	provider.HttpEngine.SetContainer(c)
+	provider.AgentEngine.SetContainer(c)
 	return nil
 }
 
@@ -30,9 +40,9 @@ func (provider *HadeKernelProvider) IsDefer() bool {
 	return false
 }
 
-// Params 参数就是一个HttpEngine
+// Params 参数依次为 HTTP、gRPC 和 Agent 引擎
 func (provider *HadeKernelProvider) Params(c framework.Container) []interface{} {
-	return []interface{}{provider.HttpEngine}
+	return []interface{}{provider.HttpEngine, provider.GrpcEngine, provider.AgentEngine}
 }
 
 // Name 提供凭证

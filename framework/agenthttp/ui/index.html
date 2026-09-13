@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Hade Agent 调试台">
+  <title>Hade Agent Console</title>
+  <link rel="stylesheet" href="/agent-ui.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <header class="brand">
+        <div class="brand-mark" aria-hidden="true">H</div>
+        <div>
+          <h1>Hade Agent</h1>
+          <p>ReAct playground</p>
+        </div>
+      </header>
+
+      <div class="connection-row">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">正在连接服务</span>
+      </div>
+
+      <button class="new-session" id="newSessionButton" type="button">
+        <span aria-hidden="true">＋</span> 新建会话
+      </button>
+
+      <section class="sidebar-section session-section">
+        <div class="section-heading">
+          <span>当前会话</span>
+          <button class="copy-button" id="copySessionButton" type="button">复制</button>
+        </div>
+        <code class="session-id" id="sessionId">尚未创建</code>
+      </section>
+
+      <section class="sidebar-section config-section">
+        <div class="section-heading">
+          <span>模型连接</span>
+          <span class="secure-badge" id="tokenBadge">未配置</span>
+        </div>
+
+        <div class="preset-row" aria-label="模型预设">
+          <button type="button" data-base="https://api.deepseek.com/v1" data-model="deepseek-chat">DeepSeek</button>
+          <button type="button" data-base="https://api.openai.com/v1" data-model="gpt-4o-mini">OpenAI</button>
+          <button type="button" data-base="https://api.moonshot.cn/v1" data-model="moonshot-v1-8k">Moonshot</button>
+        </div>
+
+        <form id="configForm">
+          <label for="baseUrl">API Base URL</label>
+          <input id="baseUrl" name="base_url" type="url" autocomplete="url" required>
+
+          <label for="model">模型</label>
+          <input id="model" name="model" type="text" autocomplete="off" required>
+
+          <label for="apiKey">API Token / Key</label>
+          <div class="secret-field">
+            <input id="apiKey" name="api_key" type="password" autocomplete="new-password" placeholder="留空则保持不变">
+            <button id="toggleSecretButton" type="button" aria-label="显示或隐藏 Token">显示</button>
+          </div>
+          <p class="field-note">Token 只保存在当前 Agent 进程内存中，不会回显或写入浏览器存储。</p>
+
+          <div class="config-actions">
+            <button class="save-config" id="saveConfigButton" type="submit">应用配置</button>
+            <button class="clear-token" id="clearTokenButton" type="button">清除 Token</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="sidebar-section tools-section">
+        <div class="section-heading">
+          <span>可用工具</span>
+          <span class="tool-count" id="toolCount">0</span>
+        </div>
+        <div class="tool-list" id="toolList">
+          <span class="muted">正在读取…</span>
+        </div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-header">
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="打开设置">☰</button>
+        <div>
+          <p class="eyebrow">AGENT CONSOLE</p>
+          <h2 id="pageTitle">业务 Agent 实验台</h2>
+        </div>
+        <div class="model-pill" id="modelPill">—</div>
+      </header>
+
+      <section class="transcript" id="transcript" aria-live="polite">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-symbol" aria-hidden="true">⌁</div>
+          <p class="eyebrow">READY WHEN YOU ARE</p>
+          <h3>把真实任务交给 Agent</h3>
+          <p>发送一条消息，查看模型思考、工具调用、执行结果和最终回复的完整链路。</p>
+          <div class="suggestion-grid">
+            <button type="button" data-prompt="调用 time 工具，告诉我现在的 UTC 时间。">查询当前时间</button>
+            <button type="button" data-prompt="请调用 echo 工具，把“Hello Hade”原样返回。">测试 Echo 工具</button>
+            <button type="button" data-prompt="介绍一下你现在可以使用哪些工具，以及它们分别能做什么。">查看工具能力</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="messageForm">
+          <textarea id="messageInput" rows="1" maxlength="65536" placeholder="输入任务，Enter 发送，Shift + Enter 换行" aria-label="发送给 Agent 的消息"></textarea>
+          <div class="composer-footer">
+            <span class="composer-hint" id="composerHint">SSE 实时事件流</span>
+            <button class="stop-button" id="stopButton" type="button" hidden>停止</button>
+            <button class="send-button" id="sendButton" type="submit" aria-label="发送消息">
+              <span>发送</span><span aria-hidden="true">↗</span>
+            </button>
+          </div>
+        </form>
+      </footer>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <script src="/agent-ui.js" defer></script>
+</body>
+</html>

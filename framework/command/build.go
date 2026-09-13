@@ -2,8 +2,11 @@ package command
 
 import (
 	"fmt"
+	"github.com/erikdubbelboer/gspt"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/gohade/hade/framework/cobra"
 )
@@ -45,7 +48,15 @@ var buildSelfCommand = &cobra.Command{
 			fmt.Println("--------------")
 			return err
 		}
-		fmt.Println("编译hade成功")
+
+		//processName := os.Args[0]
+		processName := "hade"
+		if len(os.Args) > 0 {
+			processName = filepath.Base(os.Args[0])
+		}
+		gspt.SetProcTitle(processName)
+
+		fmt.Println("编译" + processName + "成功")
 		return nil
 	},
 }

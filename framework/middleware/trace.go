@@ -5,8 +5,16 @@ import (
 	"github.com/gohade/hade/framework/gin"
 )
 
-// recovery机制，将协程中的函数异常进行捕获
-func Trace() gin.HandlerFunc {
+// Trace ...
+type Trace struct{}
+
+// NewTrace ...
+func NewTrace() *Trace {
+	return &Trace{}
+}
+
+// Func ...
+func (t *Trace) Func() gin.HandlerFunc {
 	// 使用函数回调
 	return func(c *gin.Context) {
 		// 记录开始时间

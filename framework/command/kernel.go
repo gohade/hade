@@ -2,6 +2,8 @@ package command
 
 import (
 	"github.com/gohade/hade/framework/cobra"
+	agentcmd "github.com/gohade/hade/framework/command/agent"
+	"github.com/gohade/hade/framework/command/grpc"
 	"github.com/gohade/hade/framework/command/model"
 	"github.com/robfig/cron/v3"
 )
@@ -40,6 +42,12 @@ func AddKernelCommands(root *cobra.Command) {
 	root.AddCommand(initDeployCommand())
 	// model
 	root.AddCommand(model.InitModelCommand())
+	// version
+	root.AddCommand(initVersionCommand())
+	// grpc
+	root.AddCommand(grpc.InitGrpcCommand())
+	// agent
+	root.AddCommand(agentcmd.InitAgentCommand())
 }
 
 // InitCronCommands 初始化Cron相关的命令

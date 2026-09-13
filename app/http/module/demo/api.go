@@ -2,6 +2,7 @@ package demo
 
 import (
 	demoService "github.com/gohade/hade/app/provider/demo"
+	"github.com/gohade/hade/framework/contract"
 	"github.com/gohade/hade/framework/gin"
 )
 
@@ -45,6 +46,8 @@ func (api *DemoApi) Demo(c *gin.Context) {
 // @Success 200 {array} UserDTO
 // @Router /demo/demo2 [get]
 func (api *DemoApi) Demo2(c *gin.Context) {
+	logger := c.MustMake(contract.LogKey).(contract.Log)
+	logger.Info(c, "demo2 request", nil)
 	demoProvider := c.MustMake(demoService.DemoKey).(demoService.IService)
 	students := demoProvider.GetAllStudent()
 	usersDTO := StudentsToUserDTOs(students)

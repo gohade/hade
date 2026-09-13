@@ -17,7 +17,7 @@ func NewHadeCustomLog(params ...interface{}) (interface{}, error) {
 	formatter := params[3].(contract.Formatter)
 	output := params[4].(io.Writer)
 
-	log := &HadeConsoleLog{}
+	log := &HadeCustomLog{}
 
 	log.SetLevel(level)
 	log.SetCtxFielder(ctxFielder)
